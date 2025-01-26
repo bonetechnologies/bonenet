@@ -52,6 +52,8 @@ export const TelnetClient: React.FC = () => {
     fitAddon.fit();
     terminal.current = term;
 
+    term.focus();
+
     const ws = new WebSocket('wss://xterm.bonenet.ai:26000');
     socket.current = ws;
 
