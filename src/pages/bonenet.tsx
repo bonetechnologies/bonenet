@@ -37,6 +37,9 @@ export const TelnetClient: React.FC = () => {
   const socket = useRef<WebSocket | null>(null);
   const inputBuffer = useRef<string>(''); // Buffer for user input
 
+  // Ref to track last pong time (optional for additional keep-alive logic)
+  const lastPongTime = useRef<number>(Date.now());
+
   useEffect(() => {
     const term = new Terminal({
       theme: {
@@ -68,7 +71,17 @@ export const TelnetClient: React.FC = () => {
     ws.onmessage = (event) => {
       try {
         const data = typeof event.data === 'string' ? event.data.replace(/\r?\n/g, '\r\n') : '[Non-string data received]';
+
         console.log('Data received from backend:', data); // Debug log
+
+        if (data.trim() === 'pong') {
+          // Handle pong response internally
+          console.log('Received pong from server. Connection is alive.');
+          lastPongTime.current = Date.now(); // Update last pong time
+          // Optionally, you can implement additional logic here
+          return; // Do not write 'pong' to the terminal
+        }
+
         term.write(data); // Write Telnet server responses to the terminal
       } catch (error) {
         console.error('Error processing WebSocket message:', error);
@@ -98,6 +111,7 @@ export const TelnetClient: React.FC = () => {
 
     ws.onclose = () => {
       term.write('\r\nConnection closed.\r\n');
+      clearInterval(keepAliveInterval); // Stop the keep-alive interval
     };
 
     ws.onerror = (error) => {
@@ -108,6 +122,7 @@ export const TelnetClient: React.FC = () => {
     return () => {
       term.dispose();
       ws.close(); // Close the WebSocket connection on unmount
+      clearInterval(keepAliveInterval); // Clear the keep-alive interval on unmount
     };
   }, []);
 
