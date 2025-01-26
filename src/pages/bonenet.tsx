@@ -57,6 +57,13 @@ export const TelnetClient: React.FC = () => {
     const ws = new WebSocket('wss://xterm.bonenet.ai:26000');
     socket.current = ws;
 
+    // Keep-Alive Interval
+    const keepAliveInterval = setInterval(() => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send('ping'); // Send a keep-alive message
+      }
+    }, 10000); // Every 10 seconds
+
     // Handle messages from the backend WebSocket
     ws.onmessage = (event) => {
       try {
