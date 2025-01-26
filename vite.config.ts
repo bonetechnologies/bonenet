@@ -1,5 +1,13 @@
 import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react'; // Import the Vite React plugin
+
 export default defineConfig({
-  base: './', // Ensures relative paths for assets
   plugins: [react()],
+  build: {
+    rollupOptions: {
+      input: {
+        main: './index.html',
+      },
+    },
+  },
 });
