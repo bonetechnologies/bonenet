@@ -94,7 +94,7 @@ export const TelnetClient: React.FC = () => {
     term.onData((data) => {
       if (data === '\r') {
         // Send the buffered command when Enter is pressed
-        if (socket.current && inputBuffer.current.trim() !== '') {
+        if (socket.current) {
           socket.current.send(inputBuffer.current); // Send only non-empty commands
           inputBuffer.current = ''; // Clear the buffer
         }
