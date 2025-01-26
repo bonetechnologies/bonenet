@@ -1,3 +1,5 @@
+// bonenet.tsx
+
 import React, { useEffect, useRef } from 'react';
 import styled from 'styled-components';
 import { Terminal } from 'xterm';
@@ -41,6 +43,7 @@ export const TelnetClient: React.FC = () => {
   const lastPongTime = useRef<number>(Date.now());
 
   useEffect(() => {
+    // Initialize Terminal
     const term = new Terminal({
       theme: {
         background: '#1a1a1d',
@@ -57,10 +60,11 @@ export const TelnetClient: React.FC = () => {
 
     term.focus();
 
+    // Establish WebSocket Connection
     const ws = new WebSocket('wss://xterm.bonenet.ai:26000');
     socket.current = ws;
 
-    // Keep-Alive Interval
+    // Set up Keep-Alive Interval to send 'ping' every 10 seconds
     const keepAliveInterval = setInterval(() => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send('ping'); // Send a keep-alive message
@@ -70,29 +74,27 @@ export const TelnetClient: React.FC = () => {
     // Handle messages from the backend WebSocket
     ws.onmessage = (event) => {
       try {
-        const data = typeof event.data === 'string' ? event.data.replace(/\r?\n/g, '\r\n') : '[Non-string data received]';
-
-        console.log('Data received from backend:', data); // Debug log
+        const data =
+          typeof event.data === 'string' ? event.data.replace(/\r?\n/g, '\r\n') : '[Non-string data received]';
 
         if (data.trim() === 'pong') {
           // Handle pong response internally
-          console.log('Received pong from server. Connection is alive.');
+          console.log('Pong received.');
           lastPongTime.current = Date.now(); // Update last pong time
-          // Optionally, you can implement additional logic here
           return; // Do not write 'pong' to the terminal
         }
 
         term.write(data); // Write Telnet server responses to the terminal
-      } catch (error) {
-        console.error('Error processing WebSocket message:', error);
+      } catch {
+        // Silently handle any unexpected errors
       }
     };
 
-    // Buffer input and send only on Enter
+    // Handle terminal input and send commands on Enter
     term.onData((data) => {
       if (data === '\r') {
         // Send the buffered command when Enter is pressed
-        if (socket.current) {
+        if (socket.current && inputBuffer.current.trim() !== '') {
           socket.current.send(inputBuffer.current); // Send only non-empty commands
           inputBuffer.current = ''; // Clear the buffer
         }
@@ -109,16 +111,18 @@ export const TelnetClient: React.FC = () => {
       }
     });
 
+    // Handle WebSocket closure
     ws.onclose = () => {
       term.write('\r\nConnection closed.\r\n');
       clearInterval(keepAliveInterval); // Stop the keep-alive interval
     };
 
-    ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+    // Handle WebSocket errors silently
+    ws.onerror = () => {
       term.write('\r\nError: Unable to connect to the server.\r\n');
     };
 
+    // Cleanup on Component Unmount
     return () => {
       term.dispose();
       ws.close(); // Close the WebSocket connection on unmount
