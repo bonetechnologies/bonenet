@@ -93,18 +93,35 @@ const amberTheme = {
 
 const allThemes = [greenTheme, redTheme, amberTheme];
 
-/** STYLED COMPONENTS */
 const TelnetContainer = styled.div`
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   height: 100vh;
+
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
   font-family: 'Courier New', Courier, monospace;
 
-  /* Matrix-fall animation for each char */
+  /* If the entire page might scroll, style that scrollbar: */
+  overflow: auto;
+
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+  ::-webkit-scrollbar-track {
+    background: ${(props) => props.theme.background};
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: ${(props) => props.theme.foreground};
+    border-radius: 4px;
+    box-shadow: 0 0 8px ${(props) => props.theme.foreground};
+  }
+
+  scrollbar-color: ${(props) => props.theme.foreground} ${(props) => props.theme.background};
+  scrollbar-width: thin;
+
   @keyframes matrixFall {
     0% {
       transform: translateY(0);
@@ -126,7 +143,29 @@ const TerminalWrapper = styled.div`
   border: 2px solid ${(props) => props.theme.borderColor};
   border-radius: 8px;
   box-shadow: 0 0 20px ${(props) => props.theme.boxShadowColor};
-  overflow: hidden;
+
+  /* IMPORTANT: allow scrolling in the terminal area */
+  overflow: auto;
+
+  /*
+    1) For WebKit-based browsers (Chrome, Safari, Edge Chromium),
+       define a custom scrollbar
+  */
+  ::-webkit-scrollbar {
+    width: 8px; /* scrollbar thickness */
+  }
+  ::-webkit-scrollbar-track {
+    background: ${(props) => props.theme.background};
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: ${(props) => props.theme.foreground};
+    border-radius: 4px;
+    box-shadow: 0 0 8px ${(props) => props.theme.foreground};
+  }
+
+  /* 2) For Firefox, a partial fallback using scrollbar-color/width */
+  scrollbar-color: ${(props) => props.theme.foreground} ${(props) => props.theme.background};
+  scrollbar-width: thin; /* "auto" or "thin" */
 `;
 
 const InputContainer = styled.div`
