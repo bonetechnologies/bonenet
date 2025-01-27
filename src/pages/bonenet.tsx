@@ -4,7 +4,7 @@ import React from 'react';
 import styled from 'styled-components';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
-import MouseTrail from '../components/mousetrail'; // Adjust the path as needed
+import MouseTrail from '../components/mousetrail'; // Adjust path as needed
 import 'xterm/css/xterm.css';
 
 const TelnetContainer = styled.div`
@@ -27,6 +27,28 @@ const TerminalWrapper = styled.div`
   overflow: hidden;
 `;
 
+const InputContainer = styled.div`
+  width: 80%;
+  margin-top: 20px;
+`;
+
+const StyledInput = styled.input`
+  width: 100%;
+  padding: 10px;
+  font-size: 1rem;
+  font-family: 'Courier New', Courier, monospace;
+  color: #00ff99;
+  background-color: #1a1a1d;
+  border: 2px solid #00ff99;
+  border-radius: 8px;
+  outline: none;
+  box-shadow: 0 0 10px #00ff99;
+
+  &:focus {
+    border-color: #00ffaa;
+  }
+`;
+
 const Header = styled.h1`
   font-size: 2rem;
   color: #00ff99;
@@ -36,6 +58,9 @@ const Header = styled.h1`
 interface TelnetClientState {
   isAuthenticated: boolean;
   authToken: string | null;
+  commandHistory: string[];
+  historyIndex: number;     // For navigating history
+  currentInput: string;     // Current contents of the separate input box
 }
 
 export class TelnetClient extends React.Component<{}, TelnetClientState> {
@@ -44,12 +69,8 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
   private socket: WebSocket | null = null;
   private fitAddon: FitAddon | null = null;
 
-  // Store user input as we receive it
-  private inputBuffer: string = '';
-
   // Track last pong time (if you want to use this for additional logic)
   private lastPongTime: number = Date.now();
-
   // We'll set up keepAliveInterval after authentication
   private keepAliveInterval: number | null = null;
 
@@ -58,17 +79,21 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     this.state = {
       isAuthenticated: false,
       authToken: null,
+      commandHistory: [],
+      historyIndex: -1,
+      currentInput: '',
     };
   }
 
   componentDidMount() {
-    // 1. Initialize Terminal
+    // 1. Initialize Terminal (for output only now)
     this.terminal = new Terminal({
       theme: {
         background: '#1a1a1d',
         foreground: '#00ff99',
       },
       cursorBlink: true,
+      disableStdin: true, // Disable direct input in the xterm
     });
 
     this.fitAddon = new FitAddon();
@@ -79,7 +104,6 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
       this.terminal.open(this.terminalRef.current);
       this.fitAddon.fit();
     }
-    this.terminal.focus();
 
     // 2. Establish WebSocket Connection
     this.socket = new WebSocket('wss://xterm.bonenet.ai:26000');
@@ -87,6 +111,7 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     // 3. Set up WebSocket event listeners
     this.socket.onopen = () => {
       // Successfully connected to the server
+      this.writeToTerminal('Connected to the server.\r\n');
     };
 
     this.socket.onerror = () => {
@@ -104,11 +129,6 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     this.socket.onmessage = (event) => {
       this.handleServerMessage(event);
     };
-
-    // 4. Handle terminal input
-    this.terminal.onData((data) => {
-      this.handleTerminalInput(data);
-    });
   }
 
   componentWillUnmount() {
@@ -180,41 +200,94 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
   };
 
   /**
-   * Handle user input from the terminal
+   * Handle keydown events in the separate input field, including:
+   * - Enter to send command
+   * - ArrowUp / ArrowDown to navigate history
    */
-  private handleTerminalInput(data: string) {
-    if (!this.terminal) return;
+  private handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    const { commandHistory, historyIndex, currentInput } = this.state;
 
-    // Enter key sends the buffer
-    if (data === '\r') {
-      if (this.socket && this.inputBuffer.length > 0) {
-        // Send the command in the buffer
-        this.socket.send(this.inputBuffer);
-        this.inputBuffer = '';
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!currentInput.trim()) {
+        return;
       }
-      // Move to new line on the terminal
-      this.writeToTerminal('\r\n');
-    }
-    // Backspace handling
-    else if (data === '\u0008' || data === '\x7f') {
-      if (this.inputBuffer.length > 0) {
-        this.inputBuffer = this.inputBuffer.slice(0, -1);
-        this.terminal.write('\b \b'); // Erases last character visually
+      // Send the command to the server
+      if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+        this.socket.send(currentInput);
       }
-    } else {
-      // Normal characters
-      this.inputBuffer += data;
-      // Echo back to terminal
-      this.terminal.write(data);
+      // Optionally write the command into the terminal:
+      this.writeToTerminal(`\r\n> ${currentInput}\r\n`);
+
+      // Update history
+      this.setState({
+        commandHistory: [...commandHistory, currentInput],
+        historyIndex: -1,
+        currentInput: '',
+      });
     }
-  }
+
+    else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      // Move up in history
+      if (historyIndex === -1 && commandHistory.length > 0) {
+        // If we're not currently browsing history, jump to the last command
+        this.setState({
+          historyIndex: commandHistory.length - 1,
+          currentInput: commandHistory[commandHistory.length - 1],
+        });
+      } else if (historyIndex > 0) {
+        // Move further up
+        this.setState({
+          historyIndex: historyIndex - 1,
+          currentInput: commandHistory[historyIndex - 1],
+        });
+      }
+    }
+
+    else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      // Move down in history
+      if (historyIndex >= 0 && historyIndex < commandHistory.length - 1) {
+        this.setState({
+          historyIndex: historyIndex + 1,
+          currentInput: commandHistory[historyIndex + 1],
+        });
+      } else {
+        // If we're at the last history or out of range, reset to blank
+        this.setState({
+          historyIndex: -1,
+          currentInput: '',
+        });
+      }
+    }
+  };
+
+  /**
+   * Update local state as the user types in the command input
+   */
+  private handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    this.setState({ currentInput: e.target.value });
+  };
 
   render() {
     return (
       <TelnetContainer>
         <MouseTrail />
         <Header>BONENET</Header>
-        <TerminalWrapper ref={this.terminalRef}></TerminalWrapper>
+        {/* Terminal for output */}
+        <TerminalWrapper ref={this.terminalRef} />
+
+        {/* Separate input container */}
+        <InputContainer>
+          <StyledInput
+            type="text"
+            placeholder="Enter command here..."
+            value={this.state.currentInput}
+            onChange={this.handleInputChange}
+            onKeyDown={this.handleInputKeyDown}
+          />
+        </InputContainer>
       </TelnetContainer>
     );
   }
