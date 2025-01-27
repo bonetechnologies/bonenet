@@ -6,56 +6,50 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
-/** MOUSETRAIL COMPONENT (re-written to accept color array) **/
+/** MOUSETRAIL COMPONENT (Matrix-like) **/
 interface MouseTrailProps {
   colors: string[];
 }
 
 const MouseTrail: React.FC<MouseTrailProps> = ({ colors }) => {
+  const matrixChars = '01▓░▒>+-$@%&#abcdefABCDEF';
+
   React.useEffect(() => {
-    const shapes = ['50%', '0%', 'polygon(50% 0%, 0% 100%, 100% 100%)'];
-    // circle, square, triangle
-
     const handleMouseMove = (e: MouseEvent) => {
-      // create shape
-      const shapeEl = document.createElement('div');
-      shapeEl.style.position = 'absolute';
-      shapeEl.style.width = `${Math.random() * 12 + 8}px`;
-      shapeEl.style.height = shapeEl.style.width;
-      shapeEl.style.pointerEvents = 'none';
-      shapeEl.style.top = `${e.pageY}px`;
-      shapeEl.style.left = `${e.pageX}px`;
+      const charEl = document.createElement('span');
+      charEl.style.position = 'absolute';
+      charEl.style.left = `${e.pageX}px`;
+      charEl.style.top = `${e.pageY}px`;
+      charEl.style.pointerEvents = 'none';
 
-      // random shape
-      const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
-      shapeEl.style.borderRadius = randomShape; // circle/square or clip-path triangle
-      // random color from the theme-provided array
+      // Random color from theme
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
-      shapeEl.style.backgroundColor = randomColor;
+      charEl.style.color = randomColor;
+      charEl.style.fontFamily = 'monospace';
+      charEl.style.fontSize = `${Math.random() * 8 + 12}px`; // 12-20px
+      charEl.style.userSelect = 'none';
 
-      // match the fade-out animation you already had
-      shapeEl.style.animation = 'fade-out 0.3s forwards ease-out';
-      shapeEl.style.zIndex = '9999';
+      // Random "Matrix" character
+      const randIndex = Math.floor(Math.random() * matrixChars.length);
+      charEl.textContent = matrixChars.charAt(randIndex);
 
-      document.body.appendChild(shapeEl);
+      // Animate it falling
+      charEl.style.animation = 'matrixFall 1s linear forwards';
+      charEl.style.zIndex = '9999';
 
-      setTimeout(() => {
-        shapeEl.remove();
-      }, 300); // matches the 0.3s animation
+      document.body.appendChild(charEl);
+
+      setTimeout(() => charEl.remove(), 1000);
     };
 
     document.addEventListener('mousemove', handleMouseMove);
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-    };
+    return () => document.removeEventListener('mousemove', handleMouseMove);
   }, [colors]);
 
   return null;
 };
 
-/** ====================================
- *  THEMES: Include trailColors array
- *  ==================================== */
+/** THEMES */
 const greenTheme = {
   name: 'green',
   background: '#1a1a1d',
@@ -66,7 +60,7 @@ const greenTheme = {
     background: '#1a1a1d',
     foreground: '#00ff99',
   },
-  trailColors: ['#00ff99', '#00cc88', '#009966'], // <-- for mouse trail
+  trailColors: ['#00ff99', '#00cc88', '#009966'],
 };
 
 const redTheme = {
@@ -95,13 +89,9 @@ const amberTheme = {
   trailColors: ['#ffb347', '#ff9933', '#ffcc66'],
 };
 
-// You can add as many themes as you want here
 const allThemes = [greenTheme, redTheme, amberTheme];
 
-/** ====================================
- *  STYLED COMPONENTS
- *  ==================================== */
-
+/** STYLED COMPONENTS */
 const TelnetContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -112,27 +102,18 @@ const TelnetContainer = styled.div`
   color: ${(props) => props.theme.foreground};
   font-family: 'Courier New', Courier, monospace;
 
-  /* keyframes fade-out for the MouseTrail shapes */
-  @keyframes fade-out {
+  /* Matrix-fall animation for each char */
+  @keyframes matrixFall {
     0% {
-      transform: scale(1);
+      transform: translateY(0);
       opacity: 1;
-      box-shadow: 0 0 10px ${(props) => props.theme.foreground},
-                  0 0 20px ${(props) => props.theme.foreground};
     }
-    50% {
-      transform: scale(1.2);
-      opacity: 0.6;
-      /* a bit darker or second color might be used:
-         We'll just reference theme.foreground for simplicity. */
-      box-shadow: 0 0 15px ${(props) => props.theme.foreground},
-                  0 0 30px ${(props) => props.theme.foreground};
+    70% {
+      opacity: 1;
     }
     100% {
-      transform: scale(2);
+      transform: translateY(80px);
       opacity: 0;
-      box-shadow: 0 0 5px ${(props) => props.theme.foreground},
-                  0 0 10px ${(props) => props.theme.foreground};
     }
   }
 `;
@@ -180,9 +161,7 @@ const Header = styled.h1<{ nextThemeColor: string }>`
   }
 `;
 
-/** ====================================
- *  REACT COMPONENT
- *  ==================================== */
+/** MAIN REACT COMPONENT */
 interface TelnetClientState {
   isAuthenticated: boolean;
   authToken: string | null;
@@ -211,13 +190,12 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
       commandHistory: [],
       historyIndex: -1,
       currentInput: '',
-      themeIndex: 0, // start with the 1st theme in the array (green)
+      themeIndex: 0,
     };
   }
 
   componentDidMount() {
     const currentTheme = allThemes[this.state.themeIndex].xterm;
-
     this.terminal = new Terminal({
       theme: {
         background: currentTheme.background,
@@ -236,22 +214,18 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     }
 
     this.socket = new WebSocket('wss://xterm.bonenet.ai:26000');
-
     this.socket.onopen = () => {
       this.writeToTerminal('Connected to the server.\r\n');
     };
-
     this.socket.onerror = () => {
       this.writeToTerminal('\r\nError: Unable to connect to the server.\r\n');
     };
-
     this.socket.onclose = () => {
       this.writeToTerminal('\r\nConnection closed.\r\n');
       if (this.keepAliveInterval) {
         clearInterval(this.keepAliveInterval);
       }
     };
-
     this.socket.onmessage = (event) => {
       this.handleServerMessage(event);
     };
@@ -262,15 +236,9 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
   }
 
   componentWillUnmount() {
-    if (this.terminal) {
-      this.terminal.dispose();
-    }
-    if (this.socket) {
-      this.socket.close();
-    }
-    if (this.keepAliveInterval) {
-      clearInterval(this.keepAliveInterval);
-    }
+    if (this.terminal) this.terminal.dispose();
+    if (this.socket) this.socket.close();
+    if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
   }
 
   private handleThemeSwitch = () => {
@@ -280,7 +248,6 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
         return { themeIndex: nextIndex };
       },
       () => {
-        // Also update xterm's theme
         if (this.terminal) {
           const newXtermTheme = allThemes[this.state.themeIndex].xterm;
           this.terminal.setOption('theme', {
@@ -295,6 +262,7 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
   private writeToTerminal(text: string) {
     if (this.terminal) {
       this.terminal.write(text.replace(/\r?\n/g, '\r\n'));
+      this.terminal.scrollToBottom();
     }
   }
 
@@ -306,16 +274,11 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
       this.lastPongTime = Date.now();
       return;
     }
-
     if (data.startsWith('AUTH - ')) {
       const token = data.substring('AUTH - '.length).trim();
-      this.setState(
-        { isAuthenticated: true, authToken: token },
-        this.startKeepAliveIfNeeded
-      );
+      this.setState({ isAuthenticated: true, authToken: token }, this.startKeepAliveIfNeeded);
       return;
     }
-
     this.writeToTerminal(data);
   }
 
@@ -331,17 +294,13 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
 
   private handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     const { commandHistory, historyIndex, currentInput } = this.state;
-
     if (e.key === 'Enter') {
       e.preventDefault();
-      if (!currentInput.trim()) {
-        return;
-      }
+      if (!currentInput.trim()) return;
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         this.socket.send(currentInput);
       }
       this.writeToTerminal(`\r\n> ${currentInput}\r\n`);
-
       this.setState({
         commandHistory: [...commandHistory, currentInput],
         historyIndex: -1,
@@ -381,23 +340,17 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
   };
 
   render() {
-    // Current theme
     const currentTheme = allThemes[this.state.themeIndex];
-
-    // Next theme index (for hover preview)
     const nextIndex = (this.state.themeIndex + 1) % allThemes.length;
     const nextThemeColor = allThemes[nextIndex].foreground;
 
     return (
       <ThemeProvider theme={currentTheme}>
         <TelnetContainer>
-          {/* PASS THEME'S trailColors to MouseTrail */}
+          {/* Matrix-like MouseTrail */}
           <MouseTrail colors={currentTheme.trailColors} />
 
-          <Header
-            nextThemeColor={nextThemeColor}
-            onClick={this.handleThemeSwitch}
-          >
+          <Header nextThemeColor={nextThemeColor} onClick={this.handleThemeSwitch}>
             BONENET
           </Header>
 
