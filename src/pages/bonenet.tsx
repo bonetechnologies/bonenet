@@ -4,11 +4,57 @@ import React from 'react';
 import styled, { ThemeProvider } from 'styled-components';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
-import MouseTrail from '../components/mousetrail';
 import 'xterm/css/xterm.css';
 
+/** MOUSETRAIL COMPONENT (re-written to accept color array) **/
+interface MouseTrailProps {
+  colors: string[];
+}
+
+const MouseTrail: React.FC<MouseTrailProps> = ({ colors }) => {
+  React.useEffect(() => {
+    const shapes = ['50%', '0%', 'polygon(50% 0%, 0% 100%, 100% 100%)'];
+    // circle, square, triangle
+
+    const handleMouseMove = (e: MouseEvent) => {
+      // create shape
+      const shapeEl = document.createElement('div');
+      shapeEl.style.position = 'absolute';
+      shapeEl.style.width = `${Math.random() * 12 + 8}px`;
+      shapeEl.style.height = shapeEl.style.width;
+      shapeEl.style.pointerEvents = 'none';
+      shapeEl.style.top = `${e.pageY}px`;
+      shapeEl.style.left = `${e.pageX}px`;
+
+      // random shape
+      const randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+      shapeEl.style.borderRadius = randomShape; // circle/square or clip-path triangle
+      // random color from the theme-provided array
+      const randomColor = colors[Math.floor(Math.random() * colors.length)];
+      shapeEl.style.backgroundColor = randomColor;
+
+      // match the fade-out animation you already had
+      shapeEl.style.animation = 'fade-out 0.3s forwards ease-out';
+      shapeEl.style.zIndex = '9999';
+
+      document.body.appendChild(shapeEl);
+
+      setTimeout(() => {
+        shapeEl.remove();
+      }, 300); // matches the 0.3s animation
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [colors]);
+
+  return null;
+};
+
 /** ====================================
- *  THEMES: All in one file
+ *  THEMES: Include trailColors array
  *  ==================================== */
 const greenTheme = {
   name: 'green',
@@ -20,6 +66,7 @@ const greenTheme = {
     background: '#1a1a1d',
     foreground: '#00ff99',
   },
+  trailColors: ['#00ff99', '#00cc88', '#009966'], // <-- for mouse trail
 };
 
 const redTheme = {
@@ -32,6 +79,7 @@ const redTheme = {
     background: '#2b1b1b',
     foreground: '#ff6666',
   },
+  trailColors: ['#ff6666', '#cc5050', '#993d3d'],
 };
 
 const amberTheme = {
@@ -44,6 +92,7 @@ const amberTheme = {
     background: '#332b1b',
     foreground: '#ffb347',
   },
+  trailColors: ['#ffb347', '#ff9933', '#ffcc66'],
 };
 
 // You can add as many themes as you want here
@@ -53,10 +102,6 @@ const allThemes = [greenTheme, redTheme, amberTheme];
  *  STYLED COMPONENTS
  *  ==================================== */
 
-/**
- * TelnetContainer uses the currently active theme colors
- * from ThemeProvider
- */
 const TelnetContainer = styled.div`
   display: flex;
   flex-direction: column;
@@ -66,6 +111,30 @@ const TelnetContainer = styled.div`
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
   font-family: 'Courier New', Courier, monospace;
+
+  /* keyframes fade-out for the MouseTrail shapes */
+  @keyframes fade-out {
+    0% {
+      transform: scale(1);
+      opacity: 1;
+      box-shadow: 0 0 10px ${(props) => props.theme.foreground},
+                  0 0 20px ${(props) => props.theme.foreground};
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.6;
+      /* a bit darker or second color might be used:
+         We'll just reference theme.foreground for simplicity. */
+      box-shadow: 0 0 15px ${(props) => props.theme.foreground},
+                  0 0 30px ${(props) => props.theme.foreground};
+    }
+    100% {
+      transform: scale(2);
+      opacity: 0;
+      box-shadow: 0 0 5px ${(props) => props.theme.foreground},
+                  0 0 10px ${(props) => props.theme.foreground};
+    }
+  }
 `;
 
 const TerminalWrapper = styled.div`
@@ -99,10 +168,6 @@ const StyledInput = styled.input`
   }
 `;
 
-/**
- * We add a prop `nextThemeColor` to show the next theme color on hover.
- * This allows "preview" of the next color scheme on hover.
- */
 const Header = styled.h1<{ nextThemeColor: string }>`
   font-size: 2rem;
   color: ${(props) => props.theme.foreground};
@@ -118,14 +183,13 @@ const Header = styled.h1<{ nextThemeColor: string }>`
 /** ====================================
  *  REACT COMPONENT
  *  ==================================== */
-
 interface TelnetClientState {
   isAuthenticated: boolean;
   authToken: string | null;
   commandHistory: string[];
-  historyIndex: number; // For navigating history
-  currentInput: string; // Current contents of the separate input box
-  themeIndex: number;   // Which theme in the array we're on
+  historyIndex: number;
+  currentInput: string;
+  themeIndex: number;
 }
 
 export class TelnetClient extends React.Component<{}, TelnetClientState> {
@@ -152,7 +216,6 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
   }
 
   componentDidMount() {
-    // 1. Initialize xterm
     const currentTheme = allThemes[this.state.themeIndex].xterm;
 
     this.terminal = new Terminal({
@@ -167,13 +230,11 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     this.fitAddon = new FitAddon();
     this.terminal.loadAddon(this.fitAddon);
 
-    // Mount the terminal in the DOM
     if (this.terminalRef.current) {
       this.terminal.open(this.terminalRef.current);
       this.fitAddon.fit();
     }
 
-    // 2. WebSocket connection
     this.socket = new WebSocket('wss://xterm.bonenet.ai:26000');
 
     this.socket.onopen = () => {
@@ -195,14 +256,12 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
       this.handleServerMessage(event);
     };
 
-    // 3. Auto-focus the input box on mount
     if (this.inputRef.current) {
       this.inputRef.current.focus();
     }
   }
 
   componentWillUnmount() {
-    // Clean up
     if (this.terminal) {
       this.terminal.dispose();
     }
@@ -214,7 +273,6 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     }
   }
 
-  /** Switch to the next theme in the array */
   private handleThemeSwitch = () => {
     this.setState(
       (prev) => {
@@ -236,16 +294,13 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
 
   private writeToTerminal(text: string) {
     if (this.terminal) {
-      // Normalize newlines for xterm
       this.terminal.write(text.replace(/\r?\n/g, '\r\n'));
     }
   }
 
   private handleServerMessage(event: MessageEvent) {
     const data =
-      typeof event.data === 'string'
-        ? event.data
-        : '[Non-string data received]';
+      typeof event.data === 'string' ? event.data : '[Non-string data]';
 
     if (data.trim() === 'pong') {
       this.lastPongTime = Date.now();
@@ -328,6 +383,7 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
   render() {
     // Current theme
     const currentTheme = allThemes[this.state.themeIndex];
+
     // Next theme index (for hover preview)
     const nextIndex = (this.state.themeIndex + 1) % allThemes.length;
     const nextThemeColor = allThemes[nextIndex].foreground;
@@ -335,12 +391,9 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     return (
       <ThemeProvider theme={currentTheme}>
         <TelnetContainer>
-          <MouseTrail />
+          {/* PASS THEME'S trailColors to MouseTrail */}
+          <MouseTrail colors={currentTheme.trailColors} />
 
-          {/*
-            Instead of a button, we make "BONENET" clickable
-            We pass nextThemeColor to preview color on hover
-          */}
           <Header
             nextThemeColor={nextThemeColor}
             onClick={this.handleThemeSwitch}
