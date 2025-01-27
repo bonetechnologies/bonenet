@@ -5,7 +5,6 @@ import styled, { ThemeProvider } from 'styled-components';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
-
 /** MOUSETRAIL COMPONENT (Matrix-like) **/
 interface MouseTrailProps {
   colors: string[];
@@ -17,10 +16,13 @@ const MouseTrail: React.FC<MouseTrailProps> = ({ colors }) => {
   React.useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       const charEl = document.createElement('span');
-      charEl.style.position = 'absolute';
-      charEl.style.left = `${e.pageX}px`;
-      charEl.style.top = `${e.pageY}px`;
+      // Use fixed positioning so the shapes do NOT expand the document
+      charEl.style.position = 'fixed';
+      // Position at the mouse pointer within the viewport
+      charEl.style.left = `${e.clientX}px`;
+      charEl.style.top = `${e.clientY}px`;
       charEl.style.pointerEvents = 'none';
+      charEl.style.zIndex = '9999';
 
       // Random color from theme
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
@@ -35,10 +37,10 @@ const MouseTrail: React.FC<MouseTrailProps> = ({ colors }) => {
 
       // Animate it falling
       charEl.style.animation = 'matrixFall 1s linear forwards';
-      charEl.style.zIndex = '9999';
 
       document.body.appendChild(charEl);
 
+      // Clean up after 1s
       setTimeout(() => charEl.remove(), 1000);
     };
 
