@@ -65,12 +65,15 @@ interface TelnetClientState {
 
 export class TelnetClient extends React.Component<{}, TelnetClientState> {
   private terminalRef = React.createRef<HTMLDivElement>();
+  private inputRef = React.createRef<HTMLInputElement>();   // <-- 1) create a ref for the input
+
   private terminal: Terminal | null = null;
   private socket: WebSocket | null = null;
   private fitAddon: FitAddon | null = null;
 
   // Track last pong time (if you want to use this for additional logic)
   private lastPongTime: number = Date.now();
+
   // We'll set up keepAliveInterval after authentication
   private keepAliveInterval: number | null = null;
 
@@ -110,7 +113,6 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
 
     // 3. Set up WebSocket event listeners
     this.socket.onopen = () => {
-      // Successfully connected to the server
       this.writeToTerminal('Connected to the server.\r\n');
     };
 
@@ -129,6 +131,11 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
     this.socket.onmessage = (event) => {
       this.handleServerMessage(event);
     };
+
+    // 4. Auto-focus the input box on mount
+    if (this.inputRef.current) {
+      this.inputRef.current.focus();
+    }
   }
 
   componentWillUnmount() {
@@ -226,25 +233,21 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
         currentInput: '',
       });
     }
-
     else if (e.key === 'ArrowUp') {
       e.preventDefault();
       // Move up in history
       if (historyIndex === -1 && commandHistory.length > 0) {
-        // If we're not currently browsing history, jump to the last command
         this.setState({
           historyIndex: commandHistory.length - 1,
           currentInput: commandHistory[commandHistory.length - 1],
         });
       } else if (historyIndex > 0) {
-        // Move further up
         this.setState({
           historyIndex: historyIndex - 1,
           currentInput: commandHistory[historyIndex - 1],
         });
       }
     }
-
     else if (e.key === 'ArrowDown') {
       e.preventDefault();
       // Move down in history
@@ -254,7 +257,6 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
           currentInput: commandHistory[historyIndex + 1],
         });
       } else {
-        // If we're at the last history or out of range, reset to blank
         this.setState({
           historyIndex: -1,
           currentInput: '',
@@ -281,8 +283,9 @@ export class TelnetClient extends React.Component<{}, TelnetClientState> {
         {/* Separate input container */}
         <InputContainer>
           <StyledInput
+            ref={this.inputRef}                // <-- 2) attach the ref here
             type="text"
-            placeholder="Enter command here..."
+            //placeholder="Enter command here..."
             value={this.state.currentInput}
             onChange={this.handleInputChange}
             onKeyDown={this.handleInputKeyDown}
