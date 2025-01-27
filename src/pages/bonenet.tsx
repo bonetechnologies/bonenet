@@ -1,10 +1,10 @@
 // bonenet.tsx
 
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
 import styled from 'styled-components';
 import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
-import MouseTrail from '../components/mousetrail'; // Adjust the path based on your file structure
+import MouseTrail from '../components/mousetrail'; // Adjust the path as needed
 import 'xterm/css/xterm.css';
 
 const TelnetContainer = styled.div`
@@ -33,18 +33,37 @@ const Header = styled.h1`
   margin-bottom: 20px;
 `;
 
-export const TelnetClient: React.FC = () => {
-  const terminalRef = useRef<HTMLDivElement | null>(null);
-  const terminal = useRef<Terminal | null>(null);
-  const socket = useRef<WebSocket | null>(null);
-  const inputBuffer = useRef<string>(''); // Buffer for user input
+interface TelnetClientState {
+  isAuthenticated: boolean;
+  authToken: string | null;
+}
 
-  // Ref to track last pong time (optional for additional keep-alive logic)
-  const lastPongTime = useRef<number>(Date.now());
+export class TelnetClient extends React.Component<{}, TelnetClientState> {
+  private terminalRef = React.createRef<HTMLDivElement>();
+  private terminal: Terminal | null = null;
+  private socket: WebSocket | null = null;
+  private fitAddon: FitAddon | null = null;
 
-  useEffect(() => {
-    // Initialize Terminal
-    const term = new Terminal({
+  // Store user input as we receive it
+  private inputBuffer: string = '';
+
+  // Track last pong time (if you want to use this for additional logic)
+  private lastPongTime: number = Date.now();
+
+  // We'll set up keepAliveInterval after authentication
+  private keepAliveInterval: number | null = null;
+
+  constructor(props: {}) {
+    super(props);
+    this.state = {
+      isAuthenticated: false,
+      authToken: null,
+    };
+  }
+
+  componentDidMount() {
+    // 1. Initialize Terminal
+    this.terminal = new Terminal({
       theme: {
         background: '#1a1a1d',
         foreground: '#00ff99',
@@ -52,89 +71,151 @@ export const TelnetClient: React.FC = () => {
       cursorBlink: true,
     });
 
-    const fitAddon = new FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(terminalRef.current!);
-    fitAddon.fit();
-    terminal.current = term;
+    this.fitAddon = new FitAddon();
+    this.terminal.loadAddon(this.fitAddon);
 
-    term.focus();
+    // Mount the terminal in the DOM
+    if (this.terminalRef.current) {
+      this.terminal.open(this.terminalRef.current);
+      this.fitAddon.fit();
+    }
+    this.terminal.focus();
 
-    // Establish WebSocket Connection
-    const ws = new WebSocket('wss://xterm.bonenet.ai:26000');
-    socket.current = ws;
+    // 2. Establish WebSocket Connection
+    this.socket = new WebSocket('wss://xterm.bonenet.ai:26000');
 
-    // Set up Keep-Alive Interval to send 'ping' every 10 seconds
-    const keepAliveInterval = setInterval(() => {
-      if (ws.readyState === WebSocket.OPEN) {
-        ws.send('ping'); // Send a keep-alive message
-      }
-    }, 10000); // Every 10 seconds
+    // 3. Set up WebSocket event listeners
+    this.socket.onopen = () => {
+      // Successfully connected to the server
+    };
 
-    // Handle messages from the backend WebSocket
-    ws.onmessage = (event) => {
-      try {
-        const data =
-          typeof event.data === 'string' ? event.data.replace(/\r?\n/g, '\r\n') : '[Non-string data received]';
+    this.socket.onerror = () => {
+      this.writeToTerminal('\r\nError: Unable to connect to the server.\r\n');
+    };
 
-        if (data.trim() === 'pong') {
-          // Handle pong response internally
-          console.log('Pong received.');
-          lastPongTime.current = Date.now(); // Update last pong time
-          return; // Do not write 'pong' to the terminal
-        }
-
-        term.write(data); // Write Telnet server responses to the terminal
-      } catch {
-        // Silently handle any unexpected errors
+    this.socket.onclose = () => {
+      this.writeToTerminal('\r\nConnection closed.\r\n');
+      // Stop keep-alive if running
+      if (this.keepAliveInterval) {
+        clearInterval(this.keepAliveInterval);
       }
     };
 
-    // Handle terminal input and send commands on Enter
-    term.onData((data) => {
-      if (data === '\r') {
-        // Send the buffered command when Enter is pressed
-        if (socket.current) {
-          socket.current.send(inputBuffer.current); // Send only non-empty commands
-          inputBuffer.current = ''; // Clear the buffer
-        }
-        term.write('\r\n'); // Newline in the terminal
-      } else if (data === '\u0008' || data === '\x7f') {
-        // Handle Backspace
-        if (inputBuffer.current.length > 0) {
-          inputBuffer.current = inputBuffer.current.slice(0, -1);
-          term.write('\b \b'); // Remove the last character from the terminal
-        }
-      } else {
-        inputBuffer.current += data; // Add input to the buffer
-        term.write(data); // Echo input to the terminal
-      }
+    this.socket.onmessage = (event) => {
+      this.handleServerMessage(event);
+    };
+
+    // 4. Handle terminal input
+    this.terminal.onData((data) => {
+      this.handleTerminalInput(data);
     });
+  }
 
-    // Handle WebSocket closure
-    ws.onclose = () => {
-      term.write('\r\nConnection closed.\r\n');
-      clearInterval(keepAliveInterval); // Stop the keep-alive interval
-    };
+  componentWillUnmount() {
+    // Clean up terminal resources
+    if (this.terminal) {
+      this.terminal.dispose();
+    }
+    // Clean up websocket
+    if (this.socket) {
+      this.socket.close();
+    }
+    // Stop keepAlive if it’s still running
+    if (this.keepAliveInterval) {
+      clearInterval(this.keepAliveInterval);
+    }
+  }
 
-    // Handle WebSocket errors silently
-    ws.onerror = () => {
-      term.write('\r\nError: Unable to connect to the server.\r\n');
-    };
+  /**
+   * Helper: Writes text to the terminal, normalizing newlines
+   */
+  private writeToTerminal(text: string) {
+    if (this.terminal) {
+      // Replace \n with \r\n for xterm compatibility
+      this.terminal.write(text.replace(/\r?\n/g, '\r\n'));
+    }
+  }
 
-    // Cleanup on Component Unmount
-    return () => {
-      term.dispose();
-      ws.close(); // Close the WebSocket connection on unmount
-      clearInterval(keepAliveInterval); // Clear the keep-alive interval on unmount
-    };
-  }, []);
+  /**
+   * Handle messages coming from the WebSocket / Telnet server
+   */
+  private handleServerMessage(event: MessageEvent) {
+    const data =
+      typeof event.data === 'string'
+        ? event.data
+        : '[Non-string data received]';
 
-  return (
-    <TelnetContainer>
-      <MouseTrail />
-      <Header>BONENET</Header>
-      <TerminalWrapper ref={terminalRef}></TerminalWrapper>
-    </TelnetContainer>
-  );
-};
+    // Check for keep-alive 'pong'
+    if (data.trim() === 'pong') {
+      console.log('Pong received.');
+      this.lastPongTime = Date.now();
+      return; // Don't write 'pong' to the terminal
+    }
+
+    // Check for authentication message "AUTH - <token>"
+    if (data.startsWith('AUTH - ')) {
+      const token = data.substring('AUTH - '.length).trim();
+      this.setState(
+        { isAuthenticated: true, authToken: token },
+        this.startKeepAliveIfNeeded
+      );
+      return;
+    }
+
+    // Otherwise, write server output to terminal
+    this.writeToTerminal(data);
+  }
+
+  /**
+   * Once authenticated, starts a ping keep-alive every 10 seconds if not already started
+   */
+  private startKeepAliveIfNeeded = () => {
+    if (this.state.isAuthenticated && !this.keepAliveInterval) {
+      this.keepAliveInterval = window.setInterval(() => {
+        if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+          this.socket.send('ping');
+        }
+      }, 10000);
+    }
+  };
+
+  /**
+   * Handle user input from the terminal
+   */
+  private handleTerminalInput(data: string) {
+    if (!this.terminal) return;
+
+    // Enter key sends the buffer
+    if (data === '\r') {
+      if (this.socket && this.inputBuffer.length > 0) {
+        // Send the command in the buffer
+        this.socket.send(this.inputBuffer);
+        this.inputBuffer = '';
+      }
+      // Move to new line on the terminal
+      this.writeToTerminal('\r\n');
+    }
+    // Backspace handling
+    else if (data === '\u0008' || data === '\x7f') {
+      if (this.inputBuffer.length > 0) {
+        this.inputBuffer = this.inputBuffer.slice(0, -1);
+        this.terminal.write('\b \b'); // Erases last character visually
+      }
+    } else {
+      // Normal characters
+      this.inputBuffer += data;
+      // Echo back to terminal
+      this.terminal.write(data);
+    }
+  }
+
+  render() {
+    return (
+      <TelnetContainer>
+        <MouseTrail />
+        <Header>BONENET</Header>
+        <TerminalWrapper ref={this.terminalRef}></TerminalWrapper>
+      </TelnetContainer>
+    );
+  }
+}
