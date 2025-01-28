@@ -245,7 +245,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     // Reset latency data
     this.setState({ latencies: [], averageLatency: 0 });
 
-    this.socket = new WebSocket('wss://xterm.bonenet.ai:26000');
+    this.socket = new WebSocket('wss://xterm.bonenet.ai');
 
     this.socket.onopen = () => {
       this.writeToTerminal('Connected to the server.\r\n');
