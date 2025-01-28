@@ -43,7 +43,7 @@ const TerminalWrapper = styled.div`
   border-radius: 8px;
   box-shadow: 0 0 20px ${(props) => props.theme.boxShadowColor};
   overflow: auto;
-  margin-bottom: 10px; /* Match spacing with input bar */
+  //margin-bottom: 10px; /* Match spacing with input bar */
 
   ::-webkit-scrollbar {
     width: 8px;
