@@ -121,6 +121,7 @@ const HackerMenuBar = styled.div`
   height: 44px; /* Approx. match the input bar height */
   box-sizing: border-box;
   padding: 0 10px; /* Keep some horizontal padding for aesthetics */
+  flex-shrink: 0;  // ensure it doesn't shrink in a flex container
 
   .indicator-button {
     width: 16px;
@@ -210,6 +211,8 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     // Focus input immediately
     this.inputRef.current?.focus();
 
+    window.addEventListener('resize', this.handleWindowResize);
+
     // Global window click => Focus the input
     window.addEventListener('click', this.handleWindowClick);
   }
@@ -222,6 +225,9 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
 
     // Remove global click listener
     window.removeEventListener('click', this.handleWindowClick);
+
+    // Remove the resize listener
+    window.removeEventListener('resize', this.handleWindowResize);
   }
 
   private handleWindowClick = () => {
@@ -360,6 +366,12 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
       } else {
         this.setState({ historyIndex: -1, currentInput: '' });
       }
+    }
+  };
+
+  private handleWindowResize = () => {
+    if (this.fitAddon) {
+      this.fitAddon.fit();
     }
   };
 
