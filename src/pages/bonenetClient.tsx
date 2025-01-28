@@ -275,7 +275,6 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
         if (this.socket && this.socket.readyState === WebSocket.OPEN) {
           this.lastPingSentTime = Date.now();
           this.socket.send('ping');
-          console.log('Ping sent.');
         }
       }, 10000);
     }
@@ -286,7 +285,6 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
 
     if (data.trim() === 'pong') {
       const latency = Date.now() - this.lastPingSentTime;
-      console.log('Pong received. Latency:', latency);
       this.updateLatency(latency);
       return;
     }
