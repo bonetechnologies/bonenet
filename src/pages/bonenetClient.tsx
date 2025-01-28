@@ -118,11 +118,11 @@ const HackerMenuBar = styled.div`
   align-items: center;
   justify-content: flex-start;
   margin-bottom: 10px; /* Matches spacing with TerminalWrapper and InputContainer */
-  background: rgba(0, 0, 0, 0.3);
+  background-color: ${(props) => props.theme.background};
   border: 2px solid ${(props) => props.theme.borderColor};
   border-radius: 8px;
-  box-shadow: 0 0 20px ${(props) => props.theme.boxShadowColor};
-  height: 44px; /* Match the input bar height */
+  box-shadow: 0 0 10px ${(props) => props.theme.boxShadowColor};
+  height: 44px; /* Approx. match the input bar height */
   box-sizing: border-box;
   padding: 0 10px; /* Keep some horizontal padding for aesthetics */
 
