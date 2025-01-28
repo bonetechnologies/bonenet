@@ -22,20 +22,21 @@ const MatrixLikeMouseEffect: React.FC<MouseTrailProps> = ({ colors }) => {
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
       charEl.style.color = randomColor;
       charEl.style.fontFamily = 'monospace';
-      charEl.style.fontSize = `${Math.random() * 8 + 12}px`; // 12-20px
+      // Smaller font size => 10–15px
+      charEl.style.fontSize = `${Math.floor(Math.random() * 6 + 10)}px`;
       charEl.style.userSelect = 'none';
 
       // Random "Matrix" character
       const randIndex = Math.floor(Math.random() * matrixChars.length);
       charEl.textContent = matrixChars.charAt(randIndex);
 
-      // Animate it falling
-      charEl.style.animation = 'matrixFall 1s linear forwards';
+      // Shortened animation to 0.5s
+      charEl.style.animation = 'matrixFall 0.5s linear forwards';
 
       document.body.appendChild(charEl);
 
-      // Clean up after 1s
-      setTimeout(() => charEl.remove(), 1000);
+      // Clean up after 0.5s
+      setTimeout(() => charEl.remove(), 500);
     };
 
     document.addEventListener('mousemove', handleMouseMove);

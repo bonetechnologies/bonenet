@@ -108,10 +108,6 @@ const Header = styled.h1<{ nextThemeColor: string }>`
   }
 `;
 
-/**
- * HackerMenuBar with a slightly smaller connect/disconnect indicator
- * that aligns in height with the InputContainer (matching 10px padding).
- */
 const HackerMenuBar = styled.div`
   width: 80%;
   display: flex;
@@ -196,8 +192,8 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
         background: currentTheme.background,
         foreground: currentTheme.foreground,
       },
-      cursorBlink: true,
-      disableStdin: true,
+      cursorBlink: false,  // Turn off blinking cursor
+      disableStdin: true,  // Make terminal read-only
     });
 
     this.fitAddon = new FitAddon();
@@ -211,10 +207,11 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     // Init WebSocket
     this.initWebSocket();
 
-    // Focus input
-    if (this.inputRef.current) {
-      this.inputRef.current.focus();
-    }
+    // Focus input immediately
+    this.inputRef.current?.focus();
+
+    // Global window click => Focus the input
+    window.addEventListener('click', this.handleWindowClick);
   }
 
   componentWillUnmount() {
@@ -222,7 +219,15 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     if (this.terminal) this.terminal.dispose();
     if (this.socket) this.socket.close();
     if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
+
+    // Remove global click listener
+    window.removeEventListener('click', this.handleWindowClick);
   }
+
+  private handleWindowClick = () => {
+    // Whenever the user clicks anywhere, focus the input
+    this.inputRef.current?.focus();
+  };
 
   private initWebSocket() {
     // Clear any old keepAlive
@@ -302,6 +307,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
 
   private writeToTerminal(text: string) {
     if (this.terminal) {
+      // Replace \n with \r\n for proper carriage return
       this.terminal.write(text.replace(/\r?\n/g, '\r\n'));
       this.terminal.scrollToBottom();
     }
@@ -363,7 +369,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     this.setState({ currentInput: e.target.value });
   };
 
-  // Red/Green indicator for connect/disconnect
+  // Indicator click toggles connect/disconnect
   private handleIndicatorClick = () => {
     if (this.state.isConnected && this.socket) {
       this.socket.close();
@@ -372,19 +378,23 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     }
   };
 
+  // Switch theme
   private handleThemeSwitch = () => {
-    this.setState((prev) => {
-      const nextIndex = (prev.themeIndex + 1) % allThemes.length;
-      return { themeIndex: nextIndex };
-    }, () => {
-      if (this.terminal) {
-        const newXtermTheme = allThemes[this.state.themeIndex].xterm;
-        this.terminal.setOption('theme', {
-          background: newXtermTheme.background,
-          foreground: newXtermTheme.foreground,
-        });
-      }
-    });
+    this.setState(
+        (prev) => {
+          const nextIndex = (prev.themeIndex + 1) % allThemes.length;
+          return { themeIndex: nextIndex };
+        },
+        () => {
+          if (this.terminal) {
+            const newXtermTheme = allThemes[this.state.themeIndex].xterm;
+            this.terminal.setOption('theme', {
+              background: newXtermTheme.background,
+              foreground: newXtermTheme.foreground,
+            });
+          }
+        }
+    );
   };
 
   render() {
@@ -404,7 +414,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
               BONENET
             </Header>
 
-            {/* Minimal menu bar with slightly smaller connect/disconnect indicator */}
+            {/* Minimal menu bar with connect/disconnect indicator */}
             <HackerMenuBar className={isConnected ? 'connected' : ''}>
               <div
                   className="indicator-button"
