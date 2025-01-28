@@ -43,7 +43,6 @@ const TerminalWrapper = styled.div`
   border-radius: 8px;
   box-shadow: 0 0 20px ${(props) => props.theme.boxShadowColor};
   overflow: auto;
-  //margin-bottom: 10px; /* Match spacing with input bar */
 
   ::-webkit-scrollbar {
     width: 8px;
@@ -112,7 +111,8 @@ const HackerMenuBar = styled.div`
   width: 80%;
   display: flex;
   align-items: center;
-  justify-content: flex-start;
+  /* IMPORTANT: space-between so left side & help button can be separated */
+  justify-content: space-between;
   margin-bottom: 10px; /* Matches spacing with TerminalWrapper and InputContainer */
   background-color: ${(props) => props.theme.background};
   border: 2px solid ${(props) => props.theme.borderColor};
@@ -121,7 +121,13 @@ const HackerMenuBar = styled.div`
   height: 44px; /* Approx. match the input bar height */
   box-sizing: border-box;
   padding: 0 10px; /* Keep some horizontal padding for aesthetics */
-  flex-shrink: 0;  // ensure it doesn't shrink in a flex container
+  flex-shrink: 0; /* ensure it doesn't shrink in a flex container */
+
+  /* Left side: indicator button */
+  .indicator-section {
+    display: flex;
+    align-items: center;
+  }
 
   .indicator-button {
     width: 16px;
@@ -143,6 +149,21 @@ const HackerMenuBar = styled.div`
   /* Connected: center is theme's foreground color */
   &.connected .indicator-button {
     background-color: ${(props) => props.theme.foreground};
+  }
+
+  /* Right side: subtle help button */
+  .help-button {
+    font-size: 1rem;
+    color: ${(props) => props.theme.foreground};
+    cursor: pointer;
+    transition: color 0.3s, transform 0.2s;
+
+    &:hover {
+      transform: scale(1.1);
+      /* Optional: pick a slightly different color or just reuse .foreground for subtle change. */
+      color: ${(props) =>
+          props.theme.hoverColor ? props.theme.hoverColor : props.theme.foreground};
+    }
   }
 `;
 
@@ -193,8 +214,8 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
         background: currentTheme.background,
         foreground: currentTheme.foreground,
       },
-      cursorBlink: false,  // Turn off blinking cursor
-      disableStdin: true,  // Make terminal read-only
+      cursorBlink: false, // Turn off blinking cursor
+      disableStdin: true, // Make terminal read-only
     });
 
     this.fitAddon = new FitAddon();
@@ -223,16 +244,20 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     if (this.socket) this.socket.close();
     if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
 
-    // Remove global click listener
+    // Remove listeners
     window.removeEventListener('click', this.handleWindowClick);
-
-    // Remove the resize listener
     window.removeEventListener('resize', this.handleWindowResize);
   }
 
   private handleWindowClick = () => {
     // Whenever the user clicks anywhere, focus the input
     this.inputRef.current?.focus();
+  };
+
+  private handleWindowResize = () => {
+    if (this.fitAddon) {
+      this.fitAddon.fit();
+    }
   };
 
   private initWebSocket() {
@@ -369,12 +394,6 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     }
   };
 
-  private handleWindowResize = () => {
-    if (this.fitAddon) {
-      this.fitAddon.fit();
-    }
-  };
-
   private handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     this.setState({ currentInput: e.target.value });
   };
@@ -385,6 +404,19 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
       this.socket.close();
     } else {
       this.initWebSocket();
+    }
+  };
+
+  // "?" button click sends "help" to server
+  private handleHelpClick = () => {
+    const { isConnected } = this.state;
+
+    if (isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
+      this.socket.send('help');
+    } else {
+      this.writeToTerminal(
+          '\r\nNo active connection to the server. Unable to request help.\r\n'
+      );
     }
   };
 
@@ -424,19 +456,24 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
               BONENET
             </Header>
 
-            {/* Minimal menu bar with connect/disconnect indicator */}
+            {/* Minimal menu bar with connect/disconnect indicator and help button */}
             <HackerMenuBar className={isConnected ? 'connected' : ''}>
-              <div
-                  className="indicator-button"
-                  onClick={this.handleIndicatorClick}
-                  title={isConnected ? 'Click to disconnect' : 'Click to connect'}
-              />
+              <div className="indicator-section">
+                <div
+                    className="indicator-button"
+                    onClick={this.handleIndicatorClick}
+                    title={isConnected ? 'Click to disconnect' : 'Click to connect'}
+                />
+              </div>
+
+              {/* The subtle "?" help button on the right side */}
+              <div className="help-button" onClick={this.handleHelpClick}>
+                ?
+              </div>
             </HackerMenuBar>
 
             <TerminalWrapper ref={this.terminalRef}>
-              <LatencyOverlay visible={showLatency}>
-                {averageLatency}ms
-              </LatencyOverlay>
+              <LatencyOverlay visible={showLatency}>{averageLatency}ms</LatencyOverlay>
             </TerminalWrapper>
 
             <InputContainer>
