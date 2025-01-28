@@ -111,19 +111,18 @@ const HackerMenuBar = styled.div`
   width: 80%;
   display: flex;
   align-items: center;
-  /* IMPORTANT: space-between so left side & help button can be separated */
   justify-content: space-between;
-  margin-bottom: 10px; /* Matches spacing with TerminalWrapper and InputContainer */
+  margin-bottom: 10px;
   background-color: ${(props) => props.theme.background};
   border: 2px solid ${(props) => props.theme.borderColor};
   border-radius: 8px;
   box-shadow: 0 0 10px ${(props) => props.theme.boxShadowColor};
-  height: 44px; /* Approx. match the input bar height */
+  height: 44px;
   box-sizing: border-box;
-  padding: 0 10px; /* Keep some horizontal padding for aesthetics */
-  flex-shrink: 0; /* ensure it doesn't shrink in a flex container */
+  padding: 0 10px;
+  flex-shrink: 0;
+  position: relative; /* So we can position toast absolutely inside here */
 
-  /* Left side: indicator button */
   .indicator-section {
     display: flex;
     align-items: center;
@@ -135,10 +134,8 @@ const HackerMenuBar = styled.div`
     border-radius: 50%;
     margin-right: 10px;
     cursor: pointer;
-    /* The ring is always the theme's foreground color: */
     border: 2px solid ${(props) => props.theme.foreground};
-    /* Disconnected: center is black */
-    background-color: black;
+    background-color: black; /* Disconnected color */
     transition: background-color 0.3s, transform 0.2s;
 
     &:hover {
@@ -146,12 +143,10 @@ const HackerMenuBar = styled.div`
     }
   }
 
-  /* Connected: center is theme's foreground color */
   &.connected .indicator-button {
-    background-color: ${(props) => props.theme.foreground};
+    background-color: ${(props) => props.theme.foreground}; /* Connected color */
   }
 
-  /* Right side: subtle help button */
   .help-button {
     font-size: 1rem;
     color: ${(props) => props.theme.foreground};
@@ -160,11 +155,27 @@ const HackerMenuBar = styled.div`
 
     &:hover {
       transform: scale(1.1);
-      /* Optional: pick a slightly different color or just reuse .foreground for subtle change. */
       color: ${(props) =>
           props.theme.hoverColor ? props.theme.hoverColor : props.theme.foreground};
     }
   }
+`;
+
+/* Toast message absolutely centered in the menubar */
+const ToastMessage = styled.div`
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  top: 50%;
+  translate: 0 -50%;
+  background-color: rgba(255, 0, 0, 0.8);
+  color: #fff;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-family: 'Courier New', Courier, monospace;
+  z-index: 1000;
+  transition: opacity 0.5s ease-in-out;
 `;
 
 // COMPONENT
@@ -177,7 +188,10 @@ interface BonenetClientState {
   latencies: number[];
   averageLatency: number;
   isConnected: boolean;
-  showLatency: boolean; // toggles latency overlay
+  showLatency: boolean;
+  isAuthenticated: boolean;
+  authToken: string;
+  toastMessage: string; // For showing errors as a toast
 }
 
 export class BonenetClient extends React.Component<{}, BonenetClientState> {
@@ -189,7 +203,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
   private fitAddon: FitAddon | null = null;
 
   private keepAliveInterval: number | null = null;
-  private lastPingSentTime: number = 0; // Track when ping was sent
+  private lastPingSentTime: number = 0;
 
   constructor(props: {}) {
     super(props);
@@ -202,6 +216,9 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
       averageLatency: 0,
       isConnected: false,
       showLatency: false,
+      isAuthenticated: false,
+      authToken: '',
+      toastMessage: '',
     };
   }
 
@@ -214,8 +231,8 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
         background: currentTheme.background,
         foreground: currentTheme.foreground,
       },
-      cursorBlink: false, // Turn off blinking cursor
-      disableStdin: true, // Make terminal read-only
+      cursorBlink: false,  // no blinking
+      disableStdin: true,  // read-only
     });
 
     this.fitAddon = new FitAddon();
@@ -226,31 +243,23 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
       this.fitAddon.fit();
     }
 
-    // Init WebSocket
     this.initWebSocket();
 
-    // Focus input immediately
     this.inputRef.current?.focus();
-
     window.addEventListener('resize', this.handleWindowResize);
-
-    // Global window click => Focus the input
     window.addEventListener('click', this.handleWindowClick);
   }
 
   componentWillUnmount() {
-    // Cleanup
     if (this.terminal) this.terminal.dispose();
     if (this.socket) this.socket.close();
     if (this.keepAliveInterval) clearInterval(this.keepAliveInterval);
 
-    // Remove listeners
     window.removeEventListener('click', this.handleWindowClick);
     window.removeEventListener('resize', this.handleWindowResize);
   }
 
   private handleWindowClick = () => {
-    // Whenever the user clicks anywhere, focus the input
     this.inputRef.current?.focus();
   };
 
@@ -260,34 +269,49 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     }
   };
 
+  // Helper to show toast messages in the menubar
+  private showToast = (message: string, durationMs = 3000) => {
+    this.setState({ toastMessage: message });
+    setTimeout(() => {
+      this.setState({ toastMessage: '' });
+    }, durationMs);
+  };
+
   private initWebSocket() {
-    // Clear any old keepAlive
+    // Reset keep-alive
     if (this.keepAliveInterval) {
       clearInterval(this.keepAliveInterval);
       this.keepAliveInterval = null;
     }
 
-    // Reset latency data
+    // Clear latency data
     this.setState({ latencies: [], averageLatency: 0 });
 
     this.socket = new WebSocket('wss://xterm.bonenet.ai');
 
     this.socket.onopen = () => {
-      this.writeToTerminal('Connected to the server.\r\n');
-      this.setState({ isConnected: true });
+      this.writeToTerminal('Connected to the server.\r\n', true);
+      this.setState({
+        isConnected: true,
+        isAuthenticated: false,
+        authToken: '',
+      });
       this.startKeepAlive();
     };
 
     this.socket.onerror = () => {
-      this.writeToTerminal('\r\nError: Unable to connect to the server.\r\n');
+      this.writeToTerminal('\r\nError: Unable to connect to the server.\r\n', true);
     };
 
     this.socket.onclose = () => {
-      this.writeToTerminal('\r\nConnection closed.\r\n');
-      this.setState({ isConnected: false });
-      // Reset latency on disconnect
-      this.setState({ latencies: [], averageLatency: 0 });
-
+      this.writeToTerminal('\r\nConnection closed.\r\n', true);
+      this.setState({
+        isConnected: false,
+        latencies: [],
+        averageLatency: 0,
+        isAuthenticated: false,
+        authToken: '',
+      });
       if (this.keepAliveInterval) {
         clearInterval(this.keepAliveInterval);
         this.keepAliveInterval = null;
@@ -299,7 +323,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     };
   }
 
-  // Keep-alive pings
+  // Keep-alive
   private startKeepAlive() {
     if (!this.keepAliveInterval) {
       this.keepAliveInterval = window.setInterval(() => {
@@ -314,14 +338,28 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
   private handleServerMessage(event: MessageEvent) {
     const data = typeof event.data === 'string' ? event.data : '[Non-string data]';
 
+    // If we see "pong"
     if (data.trim() === 'pong') {
       const latency = Date.now() - this.lastPingSentTime;
       this.updateLatency(latency);
       return;
     }
 
-    // Otherwise, write to terminal
-    this.writeToTerminal(data);
+    // If we see "AUTH - <token>"
+    if (data.startsWith('AUTH - ')) {
+      // e.g. "AUTH - abc123xyz"
+      const token = data.substring(7).trim(); // remove "AUTH - "
+      this.setState({
+        isAuthenticated: true,
+        authToken: token,
+      });
+      // Do NOT print this to the terminal
+      return;
+    }
+
+    // Otherwise, just normal data from server
+    // => do NOT auto scroll if user is reading
+    this.writeToTerminal(data, false);
   }
 
   private updateLatency(latency: number) {
@@ -334,10 +372,17 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     });
   }
 
-  private writeToTerminal(text: string) {
-    if (this.terminal) {
-      // Replace \n with \r\n for proper carriage return
-      this.terminal.write(text.replace(/\r?\n/g, '\r\n'));
+  /**
+   * Only scroll if 'scrollToEnd' = true.
+   * For new server messages, we pass false.
+   * For local user commands, we pass true.
+   */
+  private writeToTerminal(text: string, scrollToEnd: boolean) {
+    if (!this.terminal) return;
+
+    // Convert \n to \r\n for xterm
+    this.terminal.write(text.replace(/\r?\n/g, '\r\n'));
+    if (scrollToEnd) {
       this.terminal.scrollToBottom();
     }
   }
@@ -348,21 +393,21 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     if (e.key === 'Enter') {
       e.preventDefault();
 
-      // Check local commands
+      if (!currentInput.trim()) return;
+
+      // Local command to toggle /latency overlay
       if (currentInput.trim() === '/latency') {
-        // Toggle latency overlay
-        this.setState((prev) => ({ showLatency: !prev.showLatency }));
-        this.setState({ currentInput: '' });
+        this.setState((prev) => ({ showLatency: !prev.showLatency, currentInput: '' }));
         return;
       }
 
-      if (!currentInput.trim()) return;
-
-      // Send to server
+      // Send user command to server + show in terminal
       if (this.socket && this.socket.readyState === WebSocket.OPEN) {
         this.socket.send(currentInput);
       }
-      this.writeToTerminal(`\r\n> ${currentInput}\r\n`);
+      // Only scroll if user typed a command
+      this.writeToTerminal(`\r\n> ${currentInput}\r\n`, true);
+
       this.setState({
         commandHistory: [...commandHistory, currentInput],
         historyIndex: -1,
@@ -398,7 +443,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     this.setState({ currentInput: e.target.value });
   };
 
-  // Indicator click toggles connect/disconnect
+  // Toggle connect/disconnect
   private handleIndicatorClick = () => {
     if (this.state.isConnected && this.socket) {
       this.socket.close();
@@ -407,20 +452,22 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     }
   };
 
-  // "?" button click sends "help" to server
+  // "?" clicked => only send "help" if connected & authenticated
   private handleHelpClick = () => {
-    const { isConnected } = this.state;
-
-    if (isConnected && this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.send('help');
-    } else {
-      this.writeToTerminal(
-          '\r\nNo active connection to the server. Unable to request help.\r\n'
-      );
+    const { isConnected, isAuthenticated } = this.state;
+    if (!isConnected) {
+      this.showToast('Not connected to server.');
+      return;
     }
+    if (!isAuthenticated) {
+      this.showToast('You must authenticate before sending commands.');
+      return;
+    }
+    // OK to send "help"
+    this.socket?.send('help');
   };
 
-  // Switch theme
+  // Cycle themes
   private handleThemeSwitch = () => {
     this.setState(
         (prev) => {
@@ -444,7 +491,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     const nextIndex = (this.state.themeIndex + 1) % allThemes.length;
     const nextThemeColor = allThemes[nextIndex].foreground;
 
-    const { averageLatency, isConnected, showLatency } = this.state;
+    const { averageLatency, isConnected, showLatency, toastMessage, currentInput } = this.state;
 
     return (
         <ThemeProvider theme={currentTheme}>
@@ -456,7 +503,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
               BONENET
             </Header>
 
-            {/* Minimal menu bar with connect/disconnect indicator and help button */}
+            {/* Menu bar with connect indicator & help button */}
             <HackerMenuBar className={isConnected ? 'connected' : ''}>
               <div className="indicator-section">
                 <div
@@ -466,10 +513,12 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
                 />
               </div>
 
-              {/* The subtle "?" help button on the right side */}
               <div className="help-button" onClick={this.handleHelpClick}>
                 ?
               </div>
+
+              {/* Toast error message, if any */}
+              {toastMessage && <ToastMessage>{toastMessage}</ToastMessage>}
             </HackerMenuBar>
 
             <TerminalWrapper ref={this.terminalRef}>
@@ -480,7 +529,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
               <StyledInput
                   ref={this.inputRef}
                   type="text"
-                  value={this.state.currentInput}
+                  value={currentInput}
                   onChange={this.handleInputChange}
                   onKeyDown={this.handleInputKeyDown}
               />
