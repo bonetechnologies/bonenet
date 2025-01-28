@@ -4,7 +4,7 @@ import { Terminal } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import MatrixLikeMouseEffect from '../components/matrixLikeMouseEffect';
-import { allThemes } from '../components/themes';
+import { allThemes } from '../components/bonenet_client_color_schemes';
 
 // STYLED COMPONENTS
 
