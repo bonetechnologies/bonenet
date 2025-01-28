@@ -3,8 +3,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from 'styled-components';
 import { theme } from './styles/theme';
 import { GlobalStyle } from './styles/GlobalStyle';
-import { BonecoinPage } from './pages/BonecoinPage';
-import { TelnetClient } from './pages/bonenet'; // Proper import for Bonenet page
+import { BonenetClient } from './pages/bonenetClient'; // Proper import for Bonenet page
 
 export const App: React.FC = () => {
   return (
@@ -12,8 +11,7 @@ export const App: React.FC = () => {
       <GlobalStyle />
       <BrowserRouter>
         <Routes>
-          {/* Homepage */}
-          <Route path="/" element={<TelnetClient />} />
+          <Route path="/" element={<BonenetClient />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>
