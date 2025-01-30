@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './', // Serve assets relative to the index.html
   plugins: [react()],
+  publicDir: 'public',
   build: {
     outDir: 'dist', // Output folder
     rollupOptions: {
