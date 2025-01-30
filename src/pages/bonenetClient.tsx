@@ -100,6 +100,8 @@ const Header = styled.h1<{ nextThemeColor: string }>`
   color: ${(props) => props.theme.foreground};
   margin-bottom: 10px;
   transition: color 0.3s;
+  display: flex;
+  align-items: center;
 
   &:hover {
     color: ${(props) => props.nextThemeColor};
@@ -178,6 +180,55 @@ const ToastMessage = styled.div`
   transition: opacity 0.5s ease-in-out;
 `;
 
+/**
+ * New bonecoin info container
+ */
+const BonecoinInfo = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-left: 20px;
+  font-size: 0.9rem;
+  
+  a {
+    color: ${(props) => props.theme.foreground};
+    text-decoration: none;
+    margin-bottom: 4px;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+`;
+
+const CAContainer = styled.div`
+  display: flex;
+  align-items: center;
+  color: ${(props) => props.theme.foreground};
+  cursor: pointer;
+  gap: 6px;
+
+  span {
+    user-select: none; /* So the user doesn't accidentally select partial text, 
+                          we rely on the copy icon to copy the entire CA */
+  }
+`;
+
+const CopyIcon = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid ${(props) => props.theme.foreground};
+  border-radius: 4px;
+  padding: 2px 4px;
+  font-size: 0.8rem;
+  transition: background-color 0.3s, transform 0.3s;
+  &:hover {
+    background-color: ${(props) => props.theme.foreground};
+    color: ${(props) => props.theme.background};
+    transform: scale(1.1);
+  }
+`;
+
 // COMPONENT
 
 interface BonenetClientState {
@@ -231,8 +282,8 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
         background: currentTheme.background,
         foreground: currentTheme.foreground,
       },
-      cursorBlink: false,  // no blinking
-      disableStdin: true,  // read-only
+      cursorBlink: false, // no blinking
+      disableStdin: true, // read-only
     });
 
     this.fitAddon = new FitAddon();
@@ -486,6 +537,19 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
     );
   };
 
+  private handleCopyCA = () => {
+    const CA = 'BjCmA9ZYwJ1BwusMGaSxe4pgaa9gfXTtdyX27NYEpump';
+    navigator.clipboard.writeText(CA).then(
+        () => {
+          this.showToast('CA copied to clipboard!', 2000);
+        },
+        (err) => {
+          this.showToast('Failed to copy CA.', 2000);
+          console.error('Failed to copy CA:', err);
+        }
+    );
+  };
+
   render() {
     const currentTheme = allThemes[this.state.themeIndex];
     const nextIndex = (this.state.themeIndex + 1) % allThemes.length;
@@ -498,9 +562,24 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
           <BonenetContainer>
             <MatrixLikeMouseEffect colors={currentTheme.trailColors} />
 
-            {/* Header */}
+            {/* Header + bonecoin info */}
             <Header nextThemeColor={nextThemeColor} onClick={this.handleThemeSwitch}>
               BONENET
+
+              {/* Bonecoin Info Section */}
+              <BonecoinInfo>
+                <a
+                    href="https://bonecoin.dev"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                  bonecoin.dev
+                </a>
+                <CAContainer onClick={this.handleCopyCA}>
+                  <span>CA: BjCmA9ZYwJ1BwusMGaSxe4pgaa9gfXTtdyX27NYEpump</span>
+                  <CopyIcon>📋</CopyIcon>
+                </CAContainer>
+              </BonecoinInfo>
             </Header>
 
             {/* Menu bar with connect indicator & help button */}
