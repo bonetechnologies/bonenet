@@ -40,13 +40,26 @@ const BonenetContainer = styled.div`
   }
 `;
 
-const TerminalWrapper = styled.div`
-  position: relative;
+const Wrapper = styled.div`
   width: 80%;
-  height: 70%;
+  padding: 0;
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+`;
+
+const Box = styled(Wrapper)`
   border: 2px solid ${(props) => props.theme.borderColor};
   border-radius: 8px;
+  box-shadow: 0 0 10px ${(props) => props.theme.boxShadowColor};
+`;
+
+const TerminalWrapper = styled(Box)`
+  display: block;
+  position: relative;
+  height: 70%;
   box-shadow: 0 0 20px ${(props) => props.theme.boxShadowColor};
+<<<<<<< HEAD
   overflow: hidden; /* Hide terminal scrollbars */
 
   ::-webkit-scrollbar {
@@ -72,6 +85,9 @@ const TerminalWrapper = styled.div`
     box-shadow: none;
     border-radius: 0;
   }
+=======
+  overflow: auto;
+>>>>>>> 47928cc (Styles and refactor)
 `;
 
 const LatencyOverlay = styled.div<{ visible: boolean }>`
@@ -97,26 +113,16 @@ const LatencyOverlay = styled.div<{ visible: boolean }>`
 const InputContainer = styled.div`
   width: 80%;
   margin-top: 10px;
-
-  /* Mobile adjustments */
-  @media (max-width: 768px) {
-    width: 100%;
-    margin-top: 5px;
-  }
 `;
 
 const StyledInput = styled.input`
   width: 100%;
-  padding: 10px;
   font-size: 1rem;
   font-family: 'Courier New', Courier, monospace;
   color: ${(props) => props.theme.foreground};
   background-color: ${(props) => props.theme.background};
-  border: 2px solid ${(props) => props.theme.borderColor};
-  border-radius: 8px;
+  border: none;
   outline: none;
-  box-shadow: 0 0 10px ${(props) => props.theme.boxShadowColor};
-
   &:focus {
     border-color: ${(props) => props.theme.foreground};
   }
@@ -129,14 +135,16 @@ const StyledInput = styled.input`
   }
 `;
 
-const Header = styled.h1<{ nextThemeColor: string }>`
+const Header = styled(Wrapper)<{ nextThemeColor: string }>`
+  font-family: "Press Start 2P", monospace;
+  font-weight: 700;
+  line-height: 1.2;
   font-size: 2rem;
   color: ${(props) => props.theme.foreground};
   margin-bottom: 10px;
   transition: color 0.3s;
   display: flex;
   align-items: center;
-  justify-content: center; /* Center align on mobile */
 
   &:hover {
     color: ${(props) => props.nextThemeColor};
@@ -151,16 +159,9 @@ const Header = styled.h1<{ nextThemeColor: string }>`
   }
 `;
 
-const HackerMenuBar = styled.div`
-  width: 80%;
-  display: flex;
+const HackerMenuBar = styled(Box)`
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 10px;
-  background-color: ${(props) => props.theme.background};
-  border: 2px solid ${(props) => props.theme.borderColor};
-  border-radius: 8px;
-  box-shadow: 0 0 10px ${(props) => props.theme.boxShadowColor};
   height: 44px;
   box-sizing: border-box;
   padding: 0 10px;
@@ -226,7 +227,9 @@ const HackerMenuBar = styled.div`
 const ToastMessage = styled.div`
   position: absolute;
   left: 50%;
-  transform: translate(-50%, -50%);
+  transform: translateX(-50%);
+  top: 50%;
+  translate: 0 -50%;
   background-color: rgba(255, 0, 0, 0.8);
   color: #fff;
   padding: 4px 8px;
@@ -286,9 +289,10 @@ const LinksRow = styled.div`
 `;
 
 const CAContainer = styled.div`
+  word-break: break-all;
+  overflow-wrap: break-word;
   display: flex;
   align-items: center;
-  color: ${(props) => props.theme.foreground};
   cursor: pointer;
   gap: 6px;
 
@@ -659,7 +663,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
           <BonenetContainer>
             <MatrixLikeMouseEffect colors={currentTheme.trailColors} />
 
-            {/* Header + Bonecoin Info */}
+            {/* Header + bonecoin info */}
             <Header nextThemeColor={nextThemeColor} onClick={this.handleThemeSwitch}>
               BONENET
 
@@ -720,7 +724,6 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
                   value={currentInput}
                   onChange={this.handleInputChange}
                   onKeyDown={this.handleInputKeyDown}
-                  placeholder="Enter command..."
               />
             </InputContainer>
           </BonenetContainer>
