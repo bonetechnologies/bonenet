@@ -37,4 +37,4 @@ export const amberTheme = {
     trailColors: ['#ffb347', '#ff9933', '#ffcc66'],
 };
 
-export const allThemes = [greenTheme, redTheme, amberTheme];
+export const allThemes = [greenTheme, amberTheme, redTheme];
