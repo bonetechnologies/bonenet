@@ -189,13 +189,23 @@ const BonecoinInfo = styled.div`
   align-items: flex-start;
   margin-left: 20px;
   font-size: 0.9rem;
-  
+`;
+
+const LinksRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+
   a {
     color: ${(props) => props.theme.foreground};
     text-decoration: none;
-    margin-bottom: 4px;
+    transition: color 0.3s, text-shadow 0.3s;
+    font-size: 0.9rem;
+
     &:hover {
-      text-decoration: underline;
+      color: #ff0; /* Hover color */
+      text-shadow: 0 0 5px #ff0;
     }
   }
 `;
@@ -206,11 +216,6 @@ const CAContainer = styled.div`
   color: ${(props) => props.theme.foreground};
   cursor: pointer;
   gap: 6px;
-
-  span {
-    user-select: none; /* So the user doesn't accidentally select partial text, 
-                          we rely on the copy icon to copy the entire CA */
-  }
 `;
 
 const CopyIcon = styled.span`
@@ -562,19 +567,31 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
           <BonenetContainer>
             <MatrixLikeMouseEffect colors={currentTheme.trailColors} />
 
-            {/* Header + bonecoin info */}
+            {/* Header + Bonecoin Info */}
             <Header nextThemeColor={nextThemeColor} onClick={this.handleThemeSwitch}>
               BONENET
 
               {/* Bonecoin Info Section */}
               <BonecoinInfo>
-                <a
-                    href="https://bonecoin.dev"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                  bonecoin.dev
-                </a>
+                {/* Links Row: bonecoin.dev and DexScreener */}
+                <LinksRow>
+                  <a
+                      href="https://bonecoin.dev"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                  >
+                    bonecoin.dev
+                  </a>
+                  <a
+                      href="https://dexscreener.com/solana/5afrqhmgsbxaovkbr3n1fsjmjsearwzrhzxjjdwhps6a"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                  >
+                    DexScreener
+                  </a>
+                </LinksRow>
+
+                {/* CA Copy Container */}
                 <CAContainer onClick={this.handleCopyCA}>
                   <span>CA: BjCmA9ZYwJ1BwusMGaSxe4pgaa9gfXTtdyX27NYEpump</span>
                   <CopyIcon>📋</CopyIcon>
