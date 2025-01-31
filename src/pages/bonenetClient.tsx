@@ -17,7 +17,7 @@ const BonenetContainer = styled.div`
   background: ${(props) => props.theme.background};
   color: ${(props) => props.theme.foreground};
   font-family: 'Courier New', Courier, monospace;
-  overflow: auto;
+  overflow: hidden; /* Hide scrollbars for fullscreen experience */
 
   ::-webkit-scrollbar {
     width: 8px;
@@ -33,6 +33,11 @@ const BonenetContainer = styled.div`
 
   scrollbar-color: ${(props) => props.theme.foreground} ${(props) => props.theme.background};
   scrollbar-width: thin;
+
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    padding: 10px;
+  }
 `;
 
 const TerminalWrapper = styled.div`
@@ -42,7 +47,7 @@ const TerminalWrapper = styled.div`
   border: 2px solid ${(props) => props.theme.borderColor};
   border-radius: 8px;
   box-shadow: 0 0 20px ${(props) => props.theme.boxShadowColor};
-  overflow: auto;
+  overflow: hidden; /* Hide terminal scrollbars */
 
   ::-webkit-scrollbar {
     width: 8px;
@@ -58,24 +63,46 @@ const TerminalWrapper = styled.div`
 
   scrollbar-color: ${(props) => props.theme.foreground} ${(props) => props.theme.background};
   scrollbar-width: thin;
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    width: 100%;
+    height: 60%;
+    border: none;
+    box-shadow: none;
+    border-radius: 0;
+  }
 `;
 
 const LatencyOverlay = styled.div<{ visible: boolean }>`
   position: absolute;
   top: 8px;
   right: 8px;
-  background: transparent;
+  background: rgba(0, 0, 0, 0.5);
   color: #ffffff;
   font-size: 0.9rem;
   pointer-events: none;
   z-index: 999;
   opacity: ${(props) => (props.visible ? 1 : 0)};
   transition: opacity 0.3s;
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    top: 4px;
+    right: 4px;
+    font-size: 0.8rem;
+  }
 `;
 
 const InputContainer = styled.div`
   width: 80%;
   margin-top: 10px;
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    width: 100%;
+    margin-top: 5px;
+  }
 `;
 
 const StyledInput = styled.input`
@@ -93,6 +120,13 @@ const StyledInput = styled.input`
   &:focus {
     border-color: ${(props) => props.theme.foreground};
   }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    padding: 8px;
+    font-size: 0.9rem;
+    border-radius: 4px;
+  }
 `;
 
 const Header = styled.h1<{ nextThemeColor: string }>`
@@ -102,10 +136,18 @@ const Header = styled.h1<{ nextThemeColor: string }>`
   transition: color 0.3s;
   display: flex;
   align-items: center;
+  justify-content: center; /* Center align on mobile */
 
   &:hover {
     color: ${(props) => props.nextThemeColor};
     cursor: pointer;
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    font-size: 1.5rem;
+    flex-direction: column;
+    align-items: center;
   }
 `;
 
@@ -161,15 +203,30 @@ const HackerMenuBar = styled.div`
           props.theme.hoverColor ? props.theme.hoverColor : props.theme.foreground};
     }
   }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    width: 100%;
+    height: 36px;
+    padding: 0 5px;
+
+    .indicator-button {
+      width: 14px;
+      height: 14px;
+      margin-right: 8px;
+    }
+
+    .help-button {
+      font-size: 0.9rem;
+    }
+  }
 `;
 
 /* Toast message absolutely centered in the menubar */
 const ToastMessage = styled.div`
   position: absolute;
   left: 50%;
-  transform: translateX(-50%);
-  top: 50%;
-  translate: 0 -50%;
+  transform: translate(-50%, -50%);
   background-color: rgba(255, 0, 0, 0.8);
   color: #fff;
   padding: 4px 8px;
@@ -178,6 +235,12 @@ const ToastMessage = styled.div`
   font-family: 'Courier New', Courier, monospace;
   z-index: 1000;
   transition: opacity 0.5s ease-in-out;
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    font-size: 0.8rem;
+    padding: 3px 6px;
+  }
 `;
 
 /**
@@ -189,6 +252,13 @@ const BonecoinInfo = styled.div`
   align-items: flex-start;
   margin-left: 20px;
   font-size: 0.9rem;
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    margin-left: 0;
+    align-items: center;
+    margin-top: 5px;
+  }
 `;
 
 const LinksRow = styled.div`
@@ -207,6 +277,11 @@ const LinksRow = styled.div`
       color: #ff0; /* Hover color */
       text-shadow: 0 0 5px #ff0;
     }
+
+    /* Mobile adjustments */
+    @media (max-width: 768px) {
+      font-size: 0.8rem;
+    }
   }
 `;
 
@@ -216,6 +291,17 @@ const CAContainer = styled.div`
   color: ${(props) => props.theme.foreground};
   cursor: pointer;
   gap: 6px;
+
+  span {
+    user-select: none; /* So the user doesn't accidentally select partial text, 
+                          we rely on the copy icon to copy the entire CA */
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 4px;
+  }
 `;
 
 const CopyIcon = styled.span`
@@ -231,6 +317,12 @@ const CopyIcon = styled.span`
     background-color: ${(props) => props.theme.foreground};
     color: ${(props) => props.theme.background};
     transform: scale(1.1);
+  }
+
+  /* Mobile adjustments */
+  @media (max-width: 768px) {
+    padding: 1px 3px;
+    font-size: 0.7rem;
   }
 `;
 
@@ -628,6 +720,7 @@ export class BonenetClient extends React.Component<{}, BonenetClientState> {
                   value={currentInput}
                   onChange={this.handleInputChange}
                   onKeyDown={this.handleInputKeyDown}
+                  placeholder="Enter command..."
               />
             </InputContainer>
           </BonenetContainer>
