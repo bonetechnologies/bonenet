@@ -639,7 +639,7 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                     authToken: token,
                 });
                 if (!this.creeperSseClient) {
-                    this.creeperSseClient = new BonenetSSEClient('http://localhost:8888/api/events', token);
+                    this.creeperSseClient = new BonenetSSEClient('https://xterm.bonenet.ai/api/events', token);
                     this.creeperSseClient.setEventCallback(this.handleCreeperEvent);
                 } else {
                     this.creeperSseClient.updateAuth(token);
