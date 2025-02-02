@@ -477,7 +477,7 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     }
 
     componentDidUpdate(prevProps: {}, prevState: BonenetClientState) {
-        // If the map is toggled ON and the map terminal doesn't exist yet, create it.
+        // When the map is toggled ON:
         if (!prevState.showMap && this.state.showMap) {
             this.ensureMapTerminal();
             if (this.mapTerminal) {
@@ -493,8 +493,13 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                     }, 30);
                 }
             }
+            // Print a help message to the main terminal:
+            this.writeToTerminal(
+                "\r\nBONENET HELP: Your map window is now visible. To hide the in-game map, use the command 'set auto_map 0'.\r\n",
+                true
+            );
         }
-        // If the map is toggled OFF, dispose of the terminal.
+        // When the map is toggled OFF:
         if (prevState.showMap && !this.state.showMap) {
             this.disposeMapTerminal();
         }
