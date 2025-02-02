@@ -1,7 +1,7 @@
 import { createGlobalStyle } from 'styled-components';
-import { Theme } from './theme';
+import { GlobalTheme } from './GlobalTheme';
 
-export const GlobalStyle = createGlobalStyle<{ theme: Theme }>`
+export const GlobalStyle = createGlobalStyle<{ theme: GlobalTheme }>`
     @font-face {
         font-family: 'Press Start 2P';
         src: url('/assets/PressStart2P-Regular.ttf') format('truetype');

@@ -4,7 +4,7 @@ interface MouseTrailProps {
   colors: string[];
 }
 
-const MatrixLikeMouseEffect: React.FC<MouseTrailProps> = ({ colors }) => {
+const BonenetMouseEffect: React.FC<MouseTrailProps> = ({ colors }) => {
   const matrixChars = '01▓░▒>+-$@%&#abcdefABCDEF';
 
   React.useEffect(() => {
@@ -18,7 +18,7 @@ const MatrixLikeMouseEffect: React.FC<MouseTrailProps> = ({ colors }) => {
       charEl.style.pointerEvents = 'none';
       charEl.style.zIndex = '9999';
 
-      // Random color from theme
+      // Random color from globalTheme
       const randomColor = colors[Math.floor(Math.random() * colors.length)];
       charEl.style.color = randomColor;
       charEl.style.fontFamily = 'monospace';
@@ -46,4 +46,4 @@ const MatrixLikeMouseEffect: React.FC<MouseTrailProps> = ({ colors }) => {
   return null;
 };
 
-export default MatrixLikeMouseEffect;
+export default BonenetMouseEffect;

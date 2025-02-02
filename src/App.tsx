@@ -1,17 +1,17 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider } from 'styled-components';
-import { theme } from './styles/theme';
+import { globalTheme } from './styles/GlobalTheme';
 import { GlobalStyle } from './styles/GlobalStyle';
-import { BonenetClient } from './pages/bonenetClient'; // Proper import for Bonenet page
+import { BonenetClientPage } from './pages/BonenetClientPage'; // Proper import for Bonenet page
 
 export const App: React.FC = () => {
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={globalTheme}>
       <GlobalStyle />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<BonenetClient />} />
+          <Route path="/" element={<BonenetClientPage />} />
         </Routes>
       </BrowserRouter>
     </ThemeProvider>

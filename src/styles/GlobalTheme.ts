@@ -1,4 +1,4 @@
-export const theme = {
+export const globalTheme = {
   colors: {
     primary: {
       main: '#FF4D8D',
@@ -79,4 +79,4 @@ export const theme = {
   }
 };
 
-export type Theme = typeof theme; 
+export type GlobalTheme = typeof globalTheme;
