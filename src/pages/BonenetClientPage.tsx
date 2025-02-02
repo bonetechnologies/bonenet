@@ -434,6 +434,17 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
             this.fitAddon.fit();
         }
 
+        setTimeout(() => {
+            const terminalElement = this.terminalRef.current;
+            if (terminalElement) {
+                const rect = terminalElement.getBoundingClientRect();
+                this.setState({
+                    mapWindowX: rect.right - 320, // Default width estimate
+                    mapWindowY: rect.top + 20
+                });
+            }
+        }, 100);
+
         // ---------------------
         // WS & SSE
         // ---------------------
@@ -466,15 +477,24 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     }
 
     componentDidUpdate(prevProps: {}, prevState: BonenetClientState) {
-        // If user toggles map ON but the mapTerminal doesn't exist yet, create it.
+        // If the map is toggled ON and the map terminal doesn't exist yet, create it.
         if (!prevState.showMap && this.state.showMap) {
             this.ensureMapTerminal();
-            // If we already have some mapText from the server, draw it immediately
-            if (this.mapTerminal && this.state.mapText) {
-                this.drawMap(this.state.mapText);
+            if (this.mapTerminal) {
+                if (this.state.mapText) {
+                    // If we already have map text, draw it.
+                    this.drawMap(this.state.mapText);
+                } else {
+                    // No map event yet—force a minimal terminal size.
+                    this.mapTerminal.resize(30, 10);
+                    this.mapTerminal.clear();
+                    setTimeout(() => {
+                        this.updateMapContainerSize(10, 30);
+                    }, 30);
+                }
             }
         }
-        // If user toggles the map OFF, dispose the map terminal.
+        // If the map is toggled OFF, dispose of the terminal.
         if (prevState.showMap && !this.state.showMap) {
             this.disposeMapTerminal();
         }
