@@ -1,99 +1,113 @@
+// BonenetSSEClient.ts
+// =====================================================================
+// Production-ready SSE client with a callback for all creeper events
+// Additional logging added for debugging purposes
+
 export interface CreeperEvent {
+    uuid: string;
     creeperEventType: string;
-    // Additional fields if needed, e.g. message, payload, etc.
+    payload: string;
+    epochTimestamp: number;
+    playerId: string;
+    audience: string;
 }
 
 export class BonenetSSEClient {
     private eventSource: EventSource | null = null;
     private authToken: string | null;
+    private eventCallback: (event: CreeperEvent) => void;
 
-    /**
-     * @param baseUrl  The base URL of the SSE endpoint (e.g., "http://example.com/api/events").
-     * @param authToken  Optional auth token appended as a query parameter.
-     */
     constructor(
         private baseUrl: string,
-        authToken?: string
+        authToken?: string,
+        eventCallback?: (event: CreeperEvent) => void
     ) {
         this.authToken = authToken || null;
+        this.eventCallback = eventCallback || (() => {});
+        console.log('[BonenetSSEClient] Constructor called:');
+        console.log('  baseUrl:', this.baseUrl);
+        console.log('  authToken:', this.authToken);
     }
 
-    /**
-     * Builds the full URL by appending the authentication token (if present) as a query parameter.
-     */
     private buildUrl(): string {
+        console.log('[BonenetSSEClient] buildUrl() called');
         let url = this.baseUrl;
         if (this.authToken) {
             const separator = url.includes('?') ? '&' : '?';
             url += `${separator}auth=${encodeURIComponent(this.authToken)}`;
         }
+        console.log('  Built URL:', url);
         return url;
     }
 
-    /**
-     * Starts the SSE connection if one is not already open.
-     */
     public start(): void {
+        console.log('[BonenetSSEClient] start() called');
         if (this.eventSource) {
-            console.log('SSE connection already open.');
+            console.log('  SSE connection is already open. Aborting start().');
             return;
         }
-
         const url = this.buildUrl();
-        console.log('Connecting to SSE endpoint:', url);
+        console.log('  Creating new EventSource with URL:', url);
 
-        // Because we do NOT need cookies or credentials, we just create a plain EventSource:
         this.eventSource = new EventSource(url);
 
-        this.eventSource.onopen = (event: Event) => {
-            console.log('SSE connection opened', event);
+        // Track when the connection is opened
+        this.eventSource.onopen = () => {
+            console.log('[BonenetSSEClient] SSE connection opened:', url);
         };
 
+        // Track messages
         this.eventSource.onmessage = (event: MessageEvent) => {
-            console.log("⚡ [onmessage] Raw SSE Event Received:", event.data);
+            console.log('[BonenetSSEClient] onmessage triggered');
+            console.log('  Raw event data:', event.data);
             try {
-                console.log("⚡ [onmessage] Raw SSE Event Received:", event.data);
                 const data: CreeperEvent = JSON.parse(event.data);
-                console.log('Received event type:', data.creeperEventType, data);
+                console.log('  Parsed event data:', data);
+                this.eventCallback(data);
             } catch (error) {
-                console.error('Error parsing SSE event data:', error);
+                console.error('  Error parsing SSE event data:', error);
             }
         };
 
-
-        this.eventSource.addEventListener("message", (event: MessageEvent) => {
-            console.log('⚡ [addEventListener] Raw SSE Event Received:', event.data);
-        });
-
+        // Track errors
         this.eventSource.onerror = (error: any) => {
-            console.error('SSE error:', error);
-            // Optionally close the connection on error:
-            // this.stop();
+            console.error('[BonenetSSEClient] SSE error:', error);
         };
     }
 
-    /**
-     * Stops (closes) the SSE connection.
-     */
     public stop(): void {
+        console.log('[BonenetSSEClient] stop() called');
         if (this.eventSource) {
+            console.log('  Closing existing SSE connection.');
             this.eventSource.close();
-            this.eventSource = null;
-            console.log('SSE connection closed');
+        } else {
+            console.log('  No existing SSE connection to close.');
         }
+        this.eventSource = null;
     }
 
-    /**
-     * Updates the auth token. If the token changes, the connection is restarted.
-     */
     public updateAuth(authToken: string | null): void {
+        console.log('[BonenetSSEClient] updateAuth() called');
+        console.log('  Old authToken:', this.authToken);
+        console.log('  New authToken:', authToken);
+
         if (this.authToken !== authToken) {
             this.authToken = authToken;
-            console.log('Auth token updated. Restarting SSE connection.');
+            console.log('  Auth token changed. Restarting SSE connection...');
             this.stop();
+
             if (this.authToken) {
                 this.start();
+            } else {
+                console.log('  Auth token removed, SSE not restarted.');
             }
+        } else {
+            console.log('  Auth token unchanged, doing nothing.');
         }
+    }
+
+    public setEventCallback(callback: (event: CreeperEvent) => void): void {
+        console.log('[BonenetSSEClient] setEventCallback() called');
+        this.eventCallback = callback;
     }
 }
