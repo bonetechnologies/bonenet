@@ -118,6 +118,13 @@ const HackerMenuBar = styled.div`
     padding: 0 10px;
     position: relative;
 
+    .right-section {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+    }
+    
     .indicator-section {
         display: flex;
         align-items: center;
@@ -175,7 +182,7 @@ const ToggleButton = styled.div`
     font-size: 1rem;
     color: ${(props) => props.theme.foreground};
     cursor: pointer;
-    margin-left: 10px;
+    font-weight: bold;
     transition: color 0.3s, transform 0.2s;
 
     &:hover {
@@ -317,36 +324,34 @@ const MapTitleBar = styled.div`
     padding: 0 8px;
     display: flex;
     align-items: center;
+    gap: 8px;
     cursor: move;
     user-select: none;
-    justify-content: space-between;
 `;
 
 const MapTitle = styled.div`
     flex: 1;
     text-transform: uppercase;
     letter-spacing: 1px;
-    text-align: center;
+    text-align: left;
+    font-weight: bold;
 `;
 
 const MapCloseButton = styled.div`
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background-color: black;
+    background-color: ${(props) => props.theme.foreground};
     border: 2px solid ${(props) => props.theme.foreground};
     cursor: pointer;
-    color: ${(props) => props.theme.foreground};
+    color: ${(props) => props.theme.background};
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-left: 8px;
-    transition: background-color 0.3s, transform 0.2s;
+    flex-shrink: 0;
 
     &:hover {
-        transform: scale(1.1);
-        background-color: ${(props) => props.theme.foreground};
-        color: ${(props) => props.theme.background};
+        opacity: 0.8;
     }
 `;
 
@@ -847,11 +852,15 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                                 onClick={this.handleIndicatorClick}
                                 title={isConnected ? 'Click to disconnect' : 'Click to connect'}
                             />
+                        </div>
+
+                        <div className="right-section">
                             <ToggleButton onClick={this.toggleMap}>[ MAP ]</ToggleButton>
                             <div className="help-button" onClick={this.handleHelpClick}>
                                 ?
                             </div>
                         </div>
+
                         {toastMessage && <ToastMessage>{toastMessage}</ToastMessage>}
                     </HackerMenuBar>
 
@@ -864,13 +873,13 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                     {/* Draggable map window */}
                     <MapContainer visible={showMap} x={mapWindowX} y={mapWindowY}>
                         <MapTitleBar onMouseDown={this.handleMapDragStart}>
-                            <MapTitle>MAP WINDOW</MapTitle>
                             <MapCloseButton
                                 onMouseDown={(e) => e.stopPropagation()}
                                 onClick={this.handleCloseMap}
                             >
                                 ✖
                             </MapCloseButton>
+                            <MapTitle>MAP</MapTitle>
                         </MapTitleBar>
                         <div
                             ref={this.mapTerminalRef}
