@@ -378,7 +378,7 @@ interface BonenetClientState {
 // ----------------------
 // Main Page Component
 // ----------------------
-const WS_URL = 'ws://localhost:8888';
+const WS_URL = 'wss://xterm.bonenet.ai';
 
 export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     private terminalRef = React.createRef<HTMLDivElement>();
@@ -476,6 +476,45 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         window.removeEventListener('mouseup', this.handleMapDragEnd);
     }
 
+    private repositionMapWindow() {
+        if (!this.state.showMap) return;
+
+        // Get the map container element (the parent of mapTerminalRef)
+        const container = this.mapTerminalRef.current?.parentElement;
+        if (!container) return;
+
+        // Determine the map window’s dimensions
+        const mapWidth = container.offsetWidth;
+        const mapHeight = container.offsetHeight;
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        // Get the current map window position
+        let { mapWindowX, mapWindowY } = this.state;
+        const margin = 10; // optional margin
+
+        // If the map window overflows the right edge, move it to the left.
+        if (mapWindowX + mapWidth > windowWidth) {
+            mapWindowX = windowWidth - mapWidth - margin;
+        }
+        // If it’s off the left side, adjust it
+        if (mapWindowX < margin) {
+            mapWindowX = margin;
+        }
+        // Similar adjustments for vertical positioning:
+        if (mapWindowY + mapHeight > windowHeight) {
+            mapWindowY = windowHeight - mapHeight - margin;
+        }
+        if (mapWindowY < margin) {
+            mapWindowY = margin;
+        }
+
+        // Only update state if the position has changed.
+        if (mapWindowX !== this.state.mapWindowX || mapWindowY !== this.state.mapWindowY) {
+            this.setState({ mapWindowX, mapWindowY });
+        }
+    }
+
     componentDidUpdate(prevProps: {}, prevState: BonenetClientState) {
         // When the map is toggled ON:
         if (!prevState.showMap && this.state.showMap) {
@@ -509,8 +548,8 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         if (this.fitAddon) {
             this.fitAddon.fit();
         }
-        // If the map terminal is open, we won't automatically refit it,
-        // because we want it to remain at the exact number of rows & cols.
+        // After resizing the main terminal, adjust the map window position
+        this.repositionMapWindow();
     };
 
     private handleWindowClick = () => {
