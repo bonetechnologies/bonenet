@@ -24,45 +24,33 @@ export class BonenetSSEClient {
     ) {
         this.authToken = authToken || null;
         this.eventCallback = eventCallback || (() => {});
-        console.log('[BonenetSSEClient] Constructor called:');
-        console.log('  baseUrl:', this.baseUrl);
-        console.log('  authToken:', this.authToken);
     }
 
     private buildUrl(): string {
-        console.log('[BonenetSSEClient] buildUrl() called');
         let url = this.baseUrl;
         if (this.authToken) {
             const separator = url.includes('?') ? '&' : '?';
             url += `${separator}auth=${encodeURIComponent(this.authToken)}`;
         }
-        console.log('  Built URL:', url);
         return url;
     }
 
     public start(): void {
-        console.log('[BonenetSSEClient] start() called');
         if (this.eventSource) {
-            console.log('  SSE connection is already open. Aborting start().');
             return;
         }
         const url = this.buildUrl();
-        console.log('  Creating new EventSource with URL:', url);
 
         this.eventSource = new EventSource(url);
 
         // Track when the connection is opened
         this.eventSource.onopen = () => {
-            console.log('[BonenetSSEClient] SSE connection opened:', url);
         };
 
         // Track messages
         this.eventSource.onmessage = (event: MessageEvent) => {
-            console.log('[BonenetSSEClient] onmessage triggered');
-            console.log('  Raw event data:', event.data);
             try {
                 const data: CreeperEvent = JSON.parse(event.data);
-                console.log('  Parsed event data:', data);
                 this.eventCallback(data);
             } catch (error) {
                 console.error('  Error parsing SSE event data:', error);
@@ -76,7 +64,6 @@ export class BonenetSSEClient {
     }
 
     public stop(): void {
-        console.log('[BonenetSSEClient] stop() called');
         if (this.eventSource) {
             console.log('  Closing existing SSE connection.');
             this.eventSource.close();
@@ -87,10 +74,6 @@ export class BonenetSSEClient {
     }
 
     public updateAuth(authToken: string | null): void {
-        console.log('[BonenetSSEClient] updateAuth() called');
-        console.log('  Old authToken:', this.authToken);
-        console.log('  New authToken:', authToken);
-
         if (this.authToken !== authToken) {
             this.authToken = authToken;
             console.log('  Auth token changed. Restarting SSE connection...');
@@ -107,7 +90,6 @@ export class BonenetSSEClient {
     }
 
     public setEventCallback(callback: (event: CreeperEvent) => void): void {
-        console.log('[BonenetSSEClient] setEventCallback() called');
         this.eventCallback = callback;
     }
 }
