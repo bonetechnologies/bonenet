@@ -37,4 +37,18 @@ export const amberTheme = {
     trailColors: ['#ffb347', '#ff9933', '#ffcc66'],
 };
 
-export const allThemes = [greenTheme, redTheme, amberTheme];
+export const proHackerTheme = {
+    name: 'pro_hacker',
+    background: '#000000',
+    foreground: '#dcdcdc',
+    borderColor: '#dcdcdc',
+    hoverColor: '#ff0',
+    boxShadowColor: '#dcdcdc',
+    xterm: {
+        background: '#000000',
+        foreground: '#dcdcdc',
+    },
+    trailColors: ['#dcdcdc', '#aaaaaa', '#ffffff'],
+}
+
+export const allThemes = [greenTheme, redTheme, amberTheme, proHackerTheme];
