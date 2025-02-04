@@ -690,6 +690,8 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     componentDidMount() {
         // Terminal
         const currentTheme = allThemes[this.state.themeIndex].xterm;
+        const isMobile = window.innerWidth <= 768;
+        
         this.terminal = new Terminal({
             theme: {
                 background: currentTheme.background,
@@ -697,6 +699,16 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
             },
             cursorBlink: false,
             disableStdin: true,
+            fontSize: isMobile ? 8 : 14,
+            lineHeight: 1,
+            letterSpacing: 0,
+            fontFamily: 'Courier New',
+            rows: isMobile ? 40 : 24,
+            cols: isMobile ? 50 : 80,
+            rendererType: 'canvas',
+            allowTransparency: true,
+            convertEol: true,
+            scrollback: 1000,
         });
 
         this.fitAddon = new FitAddon();
@@ -1150,7 +1162,12 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     };
 
     private handleWindowResize = () => {
-        if (this.fitAddon) {
+        if (this.fitAddon && this.terminal) {
+            const isMobile = window.innerWidth <= 768;
+            this.terminal.setOption('fontSize', isMobile ? 8 : 14);
+            this.terminal.setOption('lineHeight', 1);
+            this.terminal.setOption('letterSpacing', 0);
+            this.terminal.resize(isMobile ? 50 : 80, isMobile ? 40 : 24);
             this.fitAddon.fit();
         }
         this.repositionMapWindow();
