@@ -1222,7 +1222,7 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
             allowTransparency: true,
             fontFamily: 'Courier New',
             rendererType: 'canvas',
-            fontSize: isMobile ? 8 : 10,
+            fontSize: isMobile ? 8 : 12,
             lineHeight: 1,
             letterSpacing: 0,
             rows: 12,  // Set to match the debug output
