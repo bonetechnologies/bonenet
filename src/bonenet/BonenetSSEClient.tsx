@@ -14,82 +14,85 @@ export interface CreeperEvent {
 
 export class BonenetSSEClient {
     private eventSource: EventSource | null = null;
-    private authToken: string | null;
-    private eventCallback: (event: CreeperEvent) => void;
+    private baseUrl: string;
+    private authToken: string;
+    private eventCallback: ((event: CreeperEvent) => void) | null = null;
+    private retryCount: number = 0;
+    private maxRetries: number = 5;
+    private retryDelay: number = 1000;
 
-    constructor(
-        private baseUrl: string,
-        authToken?: string,
-        eventCallback?: (event: CreeperEvent) => void
-    ) {
-        this.authToken = authToken || null;
-        this.eventCallback = eventCallback || (() => {});
+    constructor(baseUrl: string, authToken: string) {
+        this.baseUrl = baseUrl;
+        this.authToken = authToken;
     }
 
-    private buildUrl(): string {
-        let url = this.baseUrl;
-        if (this.authToken) {
-            const separator = url.includes('?') ? '&' : '?';
-            url += `${separator}auth=${encodeURIComponent(this.authToken)}`;
-        }
-        return url;
-    }
-
-    public start(): void {
-        if (this.eventSource) {
-            return;
-        }
-        const url = this.buildUrl();
-
-        this.eventSource = new EventSource(url);
-
-        // Track when the connection is opened
-        this.eventSource.onopen = () => {
-        };
-
-        // Track messages
-        this.eventSource.onmessage = (event: MessageEvent) => {
-            try {
-                const data: CreeperEvent = JSON.parse(event.data);
-                this.eventCallback(data);
-            } catch (error) {
-                console.error('  Error parsing SSE event data:', error);
-            }
-        };
-
-        // Track errors
-        this.eventSource.onerror = (error: any) => {
-            console.error('[BonenetSSEClient] SSE error:', error);
-        };
-    }
-
-    public stop(): void {
-        if (this.eventSource) {
-            console.log('  Closing existing SSE connection.');
-            this.eventSource.close();
-        } else {
-            console.log('  No existing SSE connection to close.');
-        }
-        this.eventSource = null;
-    }
-
-    public updateAuth(authToken: string | null): void {
-        if (this.authToken !== authToken) {
-            this.authToken = authToken;
-            console.log('  Auth token changed. Restarting SSE connection...');
-            this.stop();
-
-            if (this.authToken) {
-                this.start();
-            } else {
-                console.log('  Auth token removed, SSE not restarted.');
-            }
-        } else {
-            console.log('  Auth token unchanged, doing nothing.');
-        }
-    }
-
-    public setEventCallback(callback: (event: CreeperEvent) => void): void {
+    public setEventCallback(callback: (event: CreeperEvent) => void) {
         this.eventCallback = callback;
+    }
+
+    public updateAuth(token: string) {
+        this.authToken = token;
+        // Restart connection with new token
+        this.stop();
+        this.start();
+    }
+
+    public start() {
+        if (this.eventSource) {
+            this.stop();
+        }
+
+        try {
+            const url = `${this.baseUrl}?auth=${encodeURIComponent(this.authToken)}`;
+            this.eventSource = new EventSource(url);
+
+            this.eventSource.onopen = () => {
+                console.log('[BonenetSSEClient] Connection established');
+                this.retryCount = 0; // Reset retry count on successful connection
+            };
+
+            this.eventSource.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (this.eventCallback) {
+                        this.eventCallback(data);
+                    }
+                } catch (error) {
+                    console.error('[BonenetSSEClient] Error parsing event data:', error);
+                }
+            };
+
+            this.eventSource.onerror = (error) => {
+                console.error('[BonenetSSEClient] SSE error:', error);
+                
+                if (this.eventSource?.readyState === EventSource.CLOSED) {
+                    this.handleReconnect();
+                }
+            };
+        } catch (error) {
+            console.error('[BonenetSSEClient] Error creating EventSource:', error);
+            this.handleReconnect();
+        }
+    }
+
+    private handleReconnect() {
+        if (this.retryCount < this.maxRetries) {
+            this.retryCount++;
+            console.log(`[BonenetSSEClient] Attempting reconnect ${this.retryCount}/${this.maxRetries} in ${this.retryDelay}ms`);
+            
+            setTimeout(() => {
+                this.stop();
+                this.start();
+            }, this.retryDelay * this.retryCount); // Exponential backoff
+        } else {
+            console.error('[BonenetSSEClient] Max retries reached, giving up');
+        }
+    }
+
+    public stop() {
+        if (this.eventSource) {
+            this.eventSource.close();
+            this.eventSource = null;
+        }
     }
 }

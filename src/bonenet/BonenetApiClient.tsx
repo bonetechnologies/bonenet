@@ -40,7 +40,6 @@ export class BonenetApiClient {
     private async post(endpoint: string, formFields?: NameValuePair): Promise<Response> {
         const url = `${this.baseUrl}/${endpoint}`;
         const headers: Record<string, string> = {
-            // <-- Basic Auth with an already Base64-encoded token
             'Authorization': `Basic ${this.authToken}`
         };
 
@@ -77,7 +76,7 @@ export class BonenetApiClient {
 
     /**
      * Immediately retrieve initial state from the server (similar to 'seedEvents' in Java).
-     * This helps populate things like the map for which you’re waiting for DRAW_MAP events.
+     * This helps populate things like the map for which you're waiting for DRAW_MAP events.
      */
     public async seedEvents(): Promise<void> {
         await this.post('seed');
@@ -133,7 +132,23 @@ export class BonenetApiClient {
      *  Move in a direction. Typical directions might be "north", "south", etc.
      */
     public async move(direction: string): Promise<void> {
-        await this.post('move', { direction });
+        const formData = new URLSearchParams();
+        formData.append('direction', direction);
+        
+        const url = `${this.baseUrl}/move`;
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Basic ${this.authToken}`,
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            console.warn('Move command failed:', response.status);
+            return;
+        }
     }
 
     /**

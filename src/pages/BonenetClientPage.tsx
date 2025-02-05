@@ -2,7 +2,7 @@
 
 import React from 'react';
 import styled, { ThemeProvider } from 'styled-components';
-import { Terminal } from 'xterm';
+import { Terminal, ITerminalOptions } from 'xterm';
 import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 
@@ -341,29 +341,56 @@ const ThemeColorSwatch = styled.div`
 // ----------------------
 // Map Window Styles
 // ----------------------
-const MapContainer = styled.div<{ visible: boolean; x: number; y: number }>`
-    position: absolute;
-    top: ${(props) => props.y}px;
-    left: ${(props) => props.x}px;
+interface ContainerProps {
+    visible: boolean;
+    x: number;
+    y: number;
+    width?: string;
+}
+
+const MapContainer = styled.div.attrs<ContainerProps>((props) => ({
+    style: {
+        top: `${props.y}px`,
+        left: `${props.x}px`,
+        display: props.visible ? 'block' : 'none',
+        width: props.width || '240px',
+        height: '150px'  // Set initial height to match debug output
+    }
+}))<ContainerProps>`
+    position: fixed;
     z-index: 9999;
     border: 2px solid ${(props) => props.theme.borderColor};
     border-radius: 8px;
     box-shadow: 0 0 15px ${(props) => props.theme.boxShadowColor};
     background-color: ${(props) => props.theme.background};
     overflow: hidden;
-    display: ${(props) => (props.visible ? 'inline-block' : 'none')};
+    touch-action: none;
+    transform: translate3d(0, 0, 0);
+    backface-visibility: hidden;
+    min-width: 240px;
 
-    .xterm-viewport,
-    .xterm-scroll-area {
+    .xterm-viewport {
         overflow: hidden !important;
     }
-    .xterm-scrollbar {
-        display: none !important;
+
+    .xterm-screen {
+        will-change: transform;
+    }
+
+    .xterm {
+        padding: 8px;
+    }
+
+    @media (max-width: 768px) {
+        width: 45% !important;
+        max-width: 90vw;
+        min-width: 200px;
     }
 `;
 
 const MapTitleBar = styled.div`
     height: 24px;
+    min-height: 24px;
     background-color: ${(props) => props.theme.borderColor};
     color: ${(props) => props.theme.background};
     font-size: 0.8rem;
@@ -373,6 +400,7 @@ const MapTitleBar = styled.div`
     gap: 8px;
     cursor: move;
     user-select: none;
+    flex-shrink: 0;
 `;
 
 const MapTitle = styled.div`
@@ -404,18 +432,27 @@ const MapCloseButton = styled.div`
 // ----------------------
 // Movement Window
 // ----------------------
-const MovementContainer = styled.div<{ visible: boolean; x: number; y: number }>`
-    position: absolute;
-    top: ${(props) => props.y}px;
-    left: ${(props) => props.x}px;
+const MovementContainer = styled.div.attrs<ContainerProps>((props) => ({
+    style: {
+        top: `${props.y}px`,
+        left: `${props.x}px`,
+        display: props.visible ? 'block' : 'none',
+        width: props.width
+    }
+}))<ContainerProps>`
+    position: fixed;
     z-index: 9999;
-    width: 240px;
     background-color: ${(props) => props.theme.background};
     border: 2px solid ${(props) => props.theme.borderColor};
     border-radius: 8px;
     box-shadow: 0 0 15px ${(props) => props.theme.boxShadowColor};
     user-select: none;
-    display: ${(props) => (props.visible ? 'inline-block' : 'none')};
+    touch-action: none;
+
+    @media (max-width: 768px) {
+        min-width: 45%;
+        max-width: 90vw;
+    }
 `;
 
 const MovementTitleBar = styled.div`
@@ -463,6 +500,11 @@ const MovementContent = styled.div`
     align-items: center;
     padding: 8px;
     gap: 8px;
+
+    @media (max-width: 768px) {
+        padding: 4px;
+        gap: 4px;
+    }
 `;
 
 const BindContainer = styled.label`
@@ -517,6 +559,7 @@ const MovementButton = styled.div<{ active?: boolean }>`
     justify-content: center;
     cursor: pointer;
     transition: background-color 0.2s;
+    touch-action: manipulation;
 
     background-color: ${(props) => (props.active ? props.theme.foreground : 'transparent')};
     color: ${(props) => (props.active ? props.theme.background : props.theme.foreground)};
@@ -527,6 +570,12 @@ const MovementButton = styled.div<{ active?: boolean }>`
                         ? props.theme.foreground
                         : props.theme.hoverColor || props.theme.foreground};
         color: ${(props) => props.theme.background};
+    }
+
+    @media (max-width: 768px) {
+        width: 36px;
+        height: 36px;
+        font-size: 0.8rem;
     }
 `;
 
@@ -687,6 +736,12 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         };
     }
 
+    private preventScrollWhenDragging = (e: TouchEvent): void => {
+        if (this.state.draggingMap || this.state.draggingMovement) {
+            e.preventDefault();
+        }
+    };
+
     componentDidMount() {
         // Terminal
         const currentTheme = allThemes[this.state.themeIndex].xterm;
@@ -718,6 +773,7 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
             this.fitAddon.fit();
         }
 
+        // Initial window positions
         setTimeout(() => {
             const terminalElement = this.terminalRef.current;
             if (terminalElement) {
@@ -725,6 +781,8 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                 this.setState({
                     mapWindowX: rect.right - 320,
                     mapWindowY: rect.top + 20,
+                    movementWindowX: rect.right - 280,
+                    movementWindowY: rect.top + 200,
                 });
             }
         }, 100);
@@ -737,13 +795,21 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         window.addEventListener('click', this.handleWindowClick);
         window.addEventListener('mousemove', this.handleMapDragMove);
         window.addEventListener('mouseup', this.handleMapDragEnd);
-
         window.addEventListener('mousemove', this.handleMovementDragMove);
         window.addEventListener('mouseup', this.handleMovementDragEnd);
 
         // Keyboard
         window.addEventListener('keydown', this.handleKeyDown);
         window.addEventListener('keyup', this.handleKeyUp);
+
+        // Touch events with capture phase
+        window.addEventListener('touchmove', this.handleMapTouchMove, { passive: false, capture: true });
+        window.addEventListener('touchend', this.handleMapTouchEnd, { capture: true });
+        window.addEventListener('touchmove', this.handleMovementTouchMove, { passive: false, capture: true });
+        window.addEventListener('touchend', this.handleMovementTouchEnd, { capture: true });
+
+        // Prevent scrolling when dragging
+        document.body.addEventListener('touchmove', this.preventScrollWhenDragging, { passive: false, capture: true });
     }
 
     componentWillUnmount() {
@@ -765,6 +831,15 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
 
         window.removeEventListener('keydown', this.handleKeyDown);
         window.removeEventListener('keyup', this.handleKeyUp);
+
+        // Remove touch event listeners
+        window.removeEventListener('touchmove', this.handleMapTouchMove);
+        window.removeEventListener('touchend', this.handleMapTouchEnd);
+        window.removeEventListener('touchmove', this.handleMovementTouchMove);
+        window.removeEventListener('touchend', this.handleMovementTouchEnd);
+
+        // Remove body touch event listener
+        document.body.removeEventListener('touchmove', this.preventScrollWhenDragging);
     }
 
     // ----------------------
@@ -830,16 +905,34 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     private handleCreeperEvent = (event: CreeperEvent) => {
         if (event.creeperEventType === 'DRAW_MAP') {
             try {
-                const parsed = JSON.parse(event.payload);
-                if (parsed && parsed.map) {
-                    this.setState({ mapText: parsed.map }, () => {
-                        if (this.state.showMap) {
-                            this.drawMap(parsed.map);
+                let mapData: any = event.payload;
+                
+                if (typeof mapData === 'string') {
+                    if (mapData.startsWith('{') || mapData.startsWith('"')) {
+                        try {
+                            mapData = JSON.parse(mapData);
+                        } catch (e) {
+                            mapData = mapData;
                         }
-                    });
+                    }
+                    
+                    const mapText = typeof mapData === 'object' && mapData !== null ? mapData.map : mapData;
+                    
+                    if (typeof mapText === 'string') {
+                        this.setState({ mapText }, () => {
+                            if (this.state.showMap) {
+                                if (!this.mapTerminal) {
+                                    this.ensureMapTerminal();
+                                }
+                                if (this.mapTerminal) {
+                                    this.drawMap(mapText);
+                                }
+                            }
+                        });
+                    }
                 }
             } catch (error) {
-                console.error('Error parsing DRAW_MAP payload:', error);
+                console.error('Error processing map data:', error);
             }
         }
     };
@@ -847,55 +940,20 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     // ----------------------
     // Movement
     // ----------------------
-    private moveNorth = () => {
-        this.apiClient?.move('north');
-    };
-    private moveSouth = () => {
-        this.apiClient?.move('south');
-    };
-    private moveWest = () => {
-        this.apiClient?.move('west');
-    };
-    private moveEast = () => {
-        this.apiClient?.move('east');
-    };
-    private moveUp = () => {
-        this.apiClient?.move('up');
-    };
-    private moveDown = () => {
-        this.apiClient?.move('down');
-    };
-
-    private openEnterPrompt = () => {
-        this.setState({
-            enterPromptOpen: true,
-            enterPromptValue: '',
-        });
-    };
-
-    private closeEnterPrompt = () => {
-        this.setState({
-            enterPromptOpen: false,
-            enterPromptValue: '',
-        });
-    };
-
-    private confirmEnterPrompt = () => {
-        const loc = this.state.enterPromptValue.trim();
-        if (loc.length > 0) {
-            this.apiClient?.move(`enter ${loc}`);
+    private startMovementDrag = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+        if ('touches' in e) {
+            e.preventDefault();
+            e.stopPropagation();
         }
-        this.closeEnterPrompt();
-    };
-
-    // Movement Window
-    private startMovementDrag = (e: React.MouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        e.stopPropagation();
+        
+        const isMobile = window.innerWidth <= 768;
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+        
         this.setState({
             draggingMovement: true,
-            movementDragOffsetX: e.clientX - this.state.movementWindowX,
-            movementDragOffsetY: e.clientY - this.state.movementWindowY,
+            movementDragOffsetX: isMobile ? 0 : clientX - this.state.movementWindowX,
+            movementDragOffsetY: clientY - this.state.movementWindowY,
         });
     };
 
@@ -942,6 +1000,65 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
             enterPromptValue: '',
             bindKeys: false,
         });
+    };
+
+    // Movement commands
+    private moveNorth = () => {
+        if (this.wsManager?.isSocketConnected()) {
+            this.wsManager.send('north');
+        }
+    };
+
+    private moveSouth = () => {
+        if (this.wsManager?.isSocketConnected()) {
+            this.wsManager.send('south');
+        }
+    };
+
+    private moveWest = () => {
+        if (this.wsManager?.isSocketConnected()) {
+            this.wsManager.send('west');
+        }
+    };
+
+    private moveEast = () => {
+        if (this.wsManager?.isSocketConnected()) {
+            this.wsManager.send('east');
+        }
+    };
+
+    private moveUp = () => {
+        if (this.wsManager?.isSocketConnected()) {
+            this.wsManager.send('up');
+        }
+    };
+
+    private moveDown = () => {
+        if (this.wsManager?.isSocketConnected()) {
+            this.wsManager.send('down');
+        }
+    };
+
+    private openEnterPrompt = () => {
+        this.setState({
+            enterPromptOpen: true,
+            enterPromptValue: '',
+        });
+    };
+
+    private closeEnterPrompt = () => {
+        this.setState({
+            enterPromptOpen: false,
+            enterPromptValue: '',
+        });
+    };
+
+    private confirmEnterPrompt = () => {
+        const loc = this.state.enterPromptValue.trim();
+        if (loc.length > 0) {
+            this.apiClient?.move(`enter ${loc}`);
+        }
+        this.closeEnterPrompt();
     };
 
     // Keyboard
@@ -1017,77 +1134,123 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     // ----------------------
     // Map
     // ----------------------
-    private drawMap(mapString: string) {
-        if (!this.mapTerminal) return;
+    private drawMap(mapString: string): void {
+        if (!this.mapTerminal) {
+            this.ensureMapTerminal();
+            if (!this.mapTerminal) return;
+        }
+
+        // Don't process empty strings
+        if (!mapString.trim()) return;
 
         const finalMap = this.formatMapForXterm(mapString);
-        const rawLines = finalMap.replace(/\r/g, '').split('\n');
-        const FIXED_ROWS = 10;
-        const FIXED_COLS = 30;
-
-        const processedLines: string[] = [];
-        for (let i = 0; i < FIXED_ROWS; i++) {
-            let line = i < rawLines.length ? rawLines[i] : '';
-            const visibleLength = this.stripAnsi(line).length;
-
-            if (visibleLength > FIXED_COLS) {
-                line = this.truncateAnsi(line, FIXED_COLS);
-            } else {
-                line += '\x1b[0m' + ' '.repeat(FIXED_COLS - visibleLength);
-            }
-            processedLines.push(line);
-        }
-
-        this.mapTerminal.resize(FIXED_COLS, FIXED_ROWS);
+        
+        // Calculate exact dimensions from content
+        const lines = finalMap.split('\n');
+        const numRows = lines.length;
+        const maxCols = Math.max(...lines.map(line => line.length || 0));
+        
+        // Set terminal size before writing content
+        this.mapTerminal.resize(maxCols, numRows);
+        
+        // Clear terminal and write content
         this.mapTerminal.clear();
-        this.mapTerminal.write(processedLines.join('\r\n'));
-        this.updateMapContainerSize(FIXED_ROWS, FIXED_COLS);
-    }
-
-    private stripAnsi(str: string): string {
-        return str.replace(/\x1B\[[0-?]*[ -/]*[@-~]/g, '');
-    }
-
-    private truncateAnsi(str: string, maxLength: number): string {
-        let ansi = false;
-        let strippedLength = 0;
-        const chars: string[] = [];
-
-        for (const char of str) {
-            if (char === '\x1b') ansi = true;
-            if (!ansi) strippedLength++;
-            chars.push(char);
-            if (char === 'm') ansi = false;
-            if (strippedLength === maxLength) break;
-        }
-
-        if (ansi) chars.push('\x1b[0m');
-        return chars.join('');
-    }
-
-    private updateMapContainerSize(rows: number, cols: number) {
-        const mapDiv = this.mapTerminalRef.current;
-        if (!mapDiv || !this.mapTerminal) return;
-
-        const rowEl = mapDiv.querySelector('.xterm-rows > div');
-        if (!rowEl) return;
-
-        const rowRect = rowEl.getBoundingClientRect();
-        const charWidth = rowRect.width / cols;
-        const charHeight = rowRect.height;
-
-        const container = mapDiv.parentElement;
-        if (container) {
-            container.style.width = `${Math.ceil(charWidth * cols + 8)}px`;
-            container.style.height = `${Math.ceil(charHeight * rows + 24)}px`;
-        }
+        this.mapTerminal.write(finalMap);
+        
+        // Update container size after content is rendered
+        requestAnimationFrame(() => {
+            if (this.mapTerminal) {
+                const terminal = this.mapTerminalRef.current?.querySelector('.xterm-screen') as HTMLElement;
+                if (terminal) {
+                    const titleBarHeight = 24;
+                    const containerPadding = 8;
+                    
+                    // Get actual rendered content size
+                    const contentRect = terminal.getBoundingClientRect();
+                    
+                    // Update container size
+                    const container = this.mapTerminalRef.current?.parentElement;
+                    if (container) {
+                        const totalHeight = contentRect.height + titleBarHeight + (containerPadding * 2);
+                        container.style.height = `${totalHeight}px`;
+                    }
+                }
+            }
+        });
     }
 
     private formatMapForXterm(mapString: string): string {
-        return mapString
-            .replace(/\\u001B/g, '\u001B')
+        // First unescape any escaped sequences
+        let formatted = mapString
+            .replace(/\\u001b/gi, '\u001b')
+            .replace(/\\u001B/g, '\u001b')
+            .replace(/\\x1b/gi, '\u001b')
+            .replace(/\\033/g, '\u001b')
             .replace(/\\r/g, '\r')
-            .replace(/\\n/g, '\n');
+            .replace(/\\n/g, '\n')
+            .replace(/\\/g, '');
+        
+        // If the string is still JSON-encoded, parse it
+        try {
+            if (formatted.startsWith('"') && formatted.endsWith('"')) {
+                formatted = JSON.parse(formatted);
+            }
+        } catch (error) {}
+
+        // Ensure we have proper line endings
+        return formatted.replace(/\r?\n/g, '\r\n');
+    }
+
+    private ensureMapTerminal(): void {
+        if (this.mapTerminal || !this.mapTerminalRef.current) return;
+        
+        const currentTheme = allThemes[this.state.themeIndex].xterm;
+        const isMobile = window.innerWidth <= 768;
+        
+        // First, clear any existing content
+        if (this.mapTerminalRef.current) {
+            this.mapTerminalRef.current.innerHTML = '';
+        }
+        
+        const config: ITerminalOptions = {
+            theme: {
+                background: currentTheme.background,
+                foreground: currentTheme.foreground,
+                cursor: 'transparent',
+            },
+            scrollback: 0,
+            allowTransparency: true,
+            fontFamily: 'Courier New',
+            rendererType: 'canvas',
+            fontSize: isMobile ? 8 : 10,
+            lineHeight: 1,
+            letterSpacing: 0,
+            rows: 12,  // Set to match the debug output
+            cols: 62,  // Set to match the debug output
+            convertEol: true,
+            cursorBlink: false,
+            disableStdin: true,
+            screenReaderMode: false,
+            windowsMode: false
+        };
+
+        try {
+            this.mapTerminal = new Terminal(config);
+            this.mapTerminal.open(this.mapTerminalRef.current);
+            
+            // Set initial container height
+            const container = this.mapTerminalRef.current?.parentElement;
+            if (container) {
+                container.style.height = '150px'; // Match the debug output height
+            }
+            
+            // Draw map if we have it
+            if (this.state.mapText) {
+                this.drawMap(this.state.mapText);
+            }
+        } catch (error) {
+            this.mapTerminal = null;
+        }
     }
 
     // ----------------------
@@ -1139,15 +1302,33 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         const CA = 'BjCmA9ZYwJ1BwusMGaSxe4pgaa9gfXTtdyX27NYEpump';
         navigator.clipboard.writeText(CA).then(
             () => this.showToast('CA copied to clipboard!', 2000),
-            (err) => {
-                this.showToast('Failed to copy CA.', 2000);
-                console.error('Failed to copy CA:', err);
-            }
+            () => this.showToast('Failed to copy CA.', 2000)
         );
     };
 
     private toggleMap = () => {
-        this.setState((prev) => ({ showMap: !prev.showMap }));
+        this.setState((prev) => {
+            const newShowMap = !prev.showMap;
+            
+            // If we're opening the map
+            if (newShowMap) {
+                // Ensure the terminal is created after state update
+                requestAnimationFrame(() => {
+                    this.ensureMapTerminal();
+                    if (this.state.mapText) {
+                        this.drawMap(this.state.mapText);
+                    }
+                });
+            } else {
+                // If we're closing, clean up
+                if (this.mapTerminal) {
+                    this.mapTerminal.dispose();
+                    this.mapTerminal = null;
+                }
+            }
+            
+            return { showMap: newShowMap };
+        });
     };
 
     private handleCloseMap = () => {
@@ -1173,7 +1354,7 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         this.repositionMapWindow();
     };
 
-    private handleWindowClick = () => {
+    private handleWindowClick = (e: MouseEvent) => {
         // If the user clicks outside, we close the theme menu if open
         if (this.state.showThemeMenu) {
             this.setState({ showThemeMenu: false });
@@ -1186,21 +1367,36 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     };
 
     // map drag
-    private handleMapDragStart = (e: React.MouseEvent<HTMLDivElement>) => {
-        e.preventDefault();
-        this.setState({
-            draggingMap: true,
-            dragOffsetX: e.clientX - this.state.mapWindowX,
-            dragOffsetY: e.clientY - this.state.mapWindowY,
-        });
-    };
-
     private handleMapDragMove = (e: MouseEvent) => {
         if (!this.state.draggingMap) return;
         e.preventDefault();
+
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) return;
+
         const newX = e.clientX - this.state.dragOffsetX;
         const newY = e.clientY - this.state.dragOffsetY;
-        this.setState({ mapWindowX: newX, mapWindowY: newY });
+
+        // Get window dimensions
+        const windowWidth = window.innerWidth;
+        const windowHeight = window.innerHeight;
+
+        // Get map container dimensions
+        const mapContainer = this.mapTerminalRef.current?.parentElement;
+        const mapWidth = mapContainer?.offsetWidth || 0;
+        const mapHeight = mapContainer?.offsetHeight || 0;
+
+        // Calculate bounds
+        const minX = 0;
+        const maxX = windowWidth - mapWidth;
+        const minY = 0;
+        const maxY = windowHeight - mapHeight;
+
+        // Constrain position within bounds
+        const boundedX = Math.max(minX, Math.min(maxX, newX));
+        const boundedY = Math.max(minY, Math.min(maxY, newY));
+
+        this.setState({ mapWindowX: boundedX, mapWindowY: boundedY });
     };
 
     private handleMapDragEnd = () => {
@@ -1240,51 +1436,20 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         }
     }
 
-    private ensureMapTerminal() {
-        if (this.mapTerminal || !this.mapTerminalRef.current) return;
-        const currentTheme = allThemes[this.state.themeIndex].xterm;
-        this.mapTerminal = new Terminal({
-            theme: {
-                background: currentTheme.background,
-                foreground: currentTheme.foreground,
-            },
-            scrollback: 0,
-            cursorBlink: false,
-            disableStdin: true,
-            allowTransparency: true,
-        });
-
-        this.mapTerminal.open(this.mapTerminalRef.current);
-    }
-
-    private disposeMapTerminal() {
-        if (this.mapTerminal) {
-            this.mapTerminal.dispose();
-            this.mapTerminal = null;
-        }
-    }
-
     componentDidUpdate(prevProps: {}, prevState: BonenetClientState) {
         if (!prevState.showMap && this.state.showMap) {
             this.ensureMapTerminal();
-            if (this.mapTerminal) {
-                if (this.state.mapText) {
+            if (this.state.mapText) {
+                requestAnimationFrame(() => {
                     this.drawMap(this.state.mapText);
-                } else {
-                    this.mapTerminal.resize(30, 10);
-                    this.mapTerminal.clear();
-                    setTimeout(() => {
-                        this.updateMapContainerSize(10, 30);
-                    }, 30);
-                }
+                });
             }
-            this.writeToTerminal(
-                "\r\nBONENET HELP: Your map window is now visible. To hide the in-game map, use the command 'set auto_map 0'.\r\n",
-                true
-            );
         }
         if (prevState.showMap && !this.state.showMap) {
-            this.disposeMapTerminal();
+            if (this.mapTerminal) {
+                this.mapTerminal.dispose();
+                this.mapTerminal = null;
+            }
         }
     }
 
@@ -1317,31 +1482,191 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
         });
     };
 
+    // Update the touch event handlers
+    private handleMapTouchMove = (e: TouchEvent): void => {
+        if (!this.state.draggingMap || !e.touches[0]) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const touch = e.touches[0];
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+            requestAnimationFrame(() => {
+                const mapContainer = this.mapTerminalRef.current?.parentElement as HTMLElement;
+                if (!mapContainer) return;
+
+                const mapWidth = mapContainer.offsetWidth;
+                const mapHeight = mapContainer.offsetHeight;
+                
+                // Calculate safe zones for both X and Y
+                const safeLeft = 10;
+                const safeRight = window.innerWidth - mapWidth - 10;
+                const safeTop = 60;
+                const safeBottom = window.innerHeight - mapHeight - 20;
+                
+                // Calculate target positions with touch offset
+                const targetX = Math.max(safeLeft, Math.min(safeRight, touch.clientX - this.state.dragOffsetX));
+                const targetY = Math.max(safeTop, Math.min(safeBottom, touch.clientY - this.state.dragOffsetY));
+                
+                // Apply smoothing to both X and Y
+                const currentX = this.state.mapWindowX;
+                const currentY = this.state.mapWindowY;
+                const smoothX = currentX + (targetX - currentX) * 0.3;
+                const smoothY = currentY + (targetY - currentY) * 0.3;
+                
+                this.setState({
+                    mapWindowX: smoothX,
+                    mapWindowY: smoothY
+                }, () => {
+                    this.checkWindowProximity();
+                });
+            });
+        }
+    };
+
+    private handleMapTouchEnd = (): void => {
+        if (this.state.draggingMap) {
+            this.setState({ draggingMap: false });
+        }
+    };
+
+    // Update the touch event handlers
+    private handleMovementTouchMove = (e: TouchEvent): void => {
+        if (!this.state.draggingMovement || !e.touches[0]) return;
+        e.preventDefault();
+        e.stopPropagation();
+
+        const touch = e.touches[0];
+        const isMobile = window.innerWidth <= 768;
+
+        if (isMobile) {
+            requestAnimationFrame(() => {
+                const movementContainer = document.querySelector('.movement-container') as HTMLElement;
+                if (!movementContainer) return;
+
+                const movementWidth = movementContainer.offsetWidth;
+                const movementHeight = movementContainer.offsetHeight;
+                
+                // Calculate safe zones for both X and Y
+                const safeLeft = 10;
+                const safeRight = window.innerWidth - movementWidth - 10;
+                const safeTop = 60;
+                const safeBottom = window.innerHeight - movementHeight - 20;
+                
+                // Calculate target positions with touch offset
+                const targetX = Math.max(safeLeft, Math.min(safeRight, touch.clientX - this.state.movementDragOffsetX));
+                const targetY = Math.max(safeTop, Math.min(safeBottom, touch.clientY - this.state.movementDragOffsetY));
+                
+                // Apply smoothing to both X and Y
+                const currentX = this.state.movementWindowX;
+                const currentY = this.state.movementWindowY;
+                const smoothX = currentX + (targetX - currentX) * 0.3;
+                const smoothY = currentY + (targetY - currentY) * 0.3;
+                
+                this.setState({
+                    movementWindowX: smoothX,
+                    movementWindowY: smoothY
+                }, () => {
+                    this.checkWindowProximity();
+                });
+            });
+        }
+    };
+
+    private handleMovementTouchEnd = (): void => {
+        if (this.state.draggingMovement) {
+            this.setState({ draggingMovement: false });
+        }
+    };
+
+    // Add back the checkWindowProximity method
+    private checkWindowProximity() {
+        const isMobile = window.innerWidth <= 768;
+        if (!isMobile) return;
+
+        const gap = 10;
+        const mapContainer = this.mapTerminalRef.current?.parentElement as HTMLElement;
+        const movementContainer = document.querySelector('.movement-container') as HTMLElement;
+        if (!mapContainer || !movementContainer) return;
+
+        const mapRect = mapContainer.getBoundingClientRect();
+        const movementRect = movementContainer.getBoundingClientRect();
+        const horizontalDistance = Math.abs((mapRect.left + mapRect.width) - movementRect.left);
+
+        if (horizontalDistance < gap * 2) {
+            // Windows are close enough to snap side by side
+            const halfWidth = `${Math.floor((window.innerWidth - (gap * 3)) / 2)}px`;
+            
+            requestAnimationFrame(() => {
+                this.setState({
+                    mapWindowX: gap,
+                    movementWindowX: window.innerWidth / 2 + gap / 2
+                }, () => {
+                    mapContainer.style.width = halfWidth;
+                    movementContainer.style.width = halfWidth;
+
+                    if (this.mapTerminal && this.state.mapText) {
+                        const dims = { cols: 40, rows: 25 }; // Updated dimensions for side-by-side
+                        this.mapTerminal.resize(dims.cols, dims.rows);
+                        this.drawMap(this.state.mapText);
+                    }
+                });
+            });
+        } else {
+            // Reset to default sizes
+            requestAnimationFrame(() => {
+                mapContainer.style.width = '45%';
+                movementContainer.style.width = '45%';
+                
+                if (this.mapTerminal && this.state.mapText) {
+                    const dims = { cols: 40, rows: 25 }; // Keep consistent dimensions
+                    this.mapTerminal.resize(dims.cols, dims.rows);
+                    this.drawMap(this.state.mapText);
+                }
+            });
+        }
+    }
+
+    private handleMapDragStart = (e: React.MouseEvent<HTMLDivElement> | React.TouchEvent<HTMLDivElement>) => {
+        if ('touches' in e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        
+        const isMobile = window.innerWidth <= 768;
+        const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+        
+        this.setState({
+            draggingMap: true,
+            dragOffsetX: isMobile ? 0 : clientX - this.state.mapWindowX,
+            dragOffsetY: clientY - this.state.mapWindowY,
+        });
+    };
+
     // ----------------------
     // Render
     // ----------------------
-    render() {
+    render(): JSX.Element {
         const currentTheme = allThemes[this.state.themeIndex];
+        const isMobile = window.innerWidth <= 768;
         const {
             isConnected,
             toastMessage,
             showMap,
             mapWindowX,
             mapWindowY,
-
             movementWindowOpen,
             movementWindowX,
             movementWindowY,
             bindKeys,
-
             arrowUpPressed,
             arrowDownPressed,
             arrowLeftPressed,
             arrowRightPressed,
-
             enterPromptOpen,
             enterPromptValue,
-
             showThemeMenu,
         } = this.state;
 
@@ -1427,27 +1752,57 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                     </InputContainer>
 
                     {/* MAP WINDOW */}
-                    <MapContainer visible={showMap} x={mapWindowX} y={mapWindowY}>
-                        <MapTitleBar onMouseDown={this.handleMapDragStart}>
+                    <MapContainer 
+                        visible={showMap} 
+                        x={mapWindowX} 
+                        y={mapWindowY} 
+                        width={isMobile ? '45%' : undefined}
+                    >
+                        <MapTitleBar 
+                            onMouseDown={this.handleMapDragStart}
+                            onTouchStart={this.handleMapDragStart}
+                        >
                             <MapCloseButton
                                 onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
                                 onClick={this.handleCloseMap}
                             >
                                 ✖
                             </MapCloseButton>
                             <MapTitle>MAP</MapTitle>
                         </MapTitleBar>
-                        <div ref={this.mapTerminalRef} style={{ width: '100%', height: 'calc(100% - 24px)' }} />
+                        <div 
+                            ref={this.mapTerminalRef} 
+                            style={{ 
+                                width: '100%',
+                                minHeight: '200px',
+                                overflow: 'hidden'
+                            }} 
+                        />
                     </MapContainer>
 
                     {/* MOVEMENT WINDOW */}
-                    <MovementContainer visible={movementWindowOpen} x={movementWindowX} y={movementWindowY}>
-                        <MovementTitleBar onMouseDown={this.startMovementDrag}>
-                            <MovementCloseButton onClick={this.closeMovementWindow}>✖</MovementCloseButton>
+                    <MovementContainer 
+                        className="movement-container"
+                        visible={movementWindowOpen} 
+                        x={movementWindowX} 
+                        y={movementWindowY}
+                        width={isMobile ? '45%' : '240px'}
+                    >
+                        <MovementTitleBar 
+                            onMouseDown={this.startMovementDrag}
+                            onTouchStart={this.startMovementDrag}
+                        >
+                            <MovementCloseButton 
+                                onMouseDown={(e) => e.stopPropagation()}
+                                onTouchStart={(e) => e.stopPropagation()}
+                                onClick={this.closeMovementWindow}
+                            >
+                                ✖
+                            </MovementCloseButton>
                             <MovementTitle>MOVEMENT</MovementTitle>
                         </MovementTitleBar>
                         <MovementContent>
-                            {/* Bind */}
                             <BindContainer>
                                 <input
                                     type="checkbox"
@@ -1457,32 +1812,42 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                                 <span>bind</span>
                             </BindContainer>
 
-                            {/* Arrow keys in a typical layout */}
                             <ArrowRow>
                                 <MovementButton style={{ visibility: 'hidden' }}>X</MovementButton>
-                                <MovementButton active={arrowUpPressed} onClick={this.moveNorth}>
+                                <MovementButton 
+                                    active={arrowUpPressed} 
+                                    onClick={this.moveNorth}
+                                >
                                     ↑
                                 </MovementButton>
                                 <MovementButton style={{ visibility: 'hidden' }}>X</MovementButton>
                             </ArrowRow>
                             <ArrowRow>
-                                <MovementButton active={arrowLeftPressed} onClick={this.moveWest}>
+                                <MovementButton 
+                                    active={arrowLeftPressed} 
+                                    onClick={this.moveWest}
+                                >
                                     ←
                                 </MovementButton>
                                 <MovementButton style={{ visibility: 'hidden' }}>X</MovementButton>
-                                <MovementButton active={arrowRightPressed} onClick={this.moveEast}>
+                                <MovementButton 
+                                    active={arrowRightPressed} 
+                                    onClick={this.moveEast}
+                                >
                                     →
                                 </MovementButton>
                             </ArrowRow>
                             <ArrowRow>
                                 <MovementButton style={{ visibility: 'hidden' }}>X</MovementButton>
-                                <MovementButton active={arrowDownPressed} onClick={this.moveSouth}>
+                                <MovementButton 
+                                    active={arrowDownPressed} 
+                                    onClick={this.moveSouth}
+                                >
                                     ↓
                                 </MovementButton>
                                 <MovementButton style={{ visibility: 'hidden' }}>X</MovementButton>
                             </ArrowRow>
 
-                            {/* Row for U, D, E */}
                             <ArrowRow>
                                 <MovementButton onClick={this.moveUp}>U</MovementButton>
                                 <MovementButton onClick={this.moveDown}>D</MovementButton>
