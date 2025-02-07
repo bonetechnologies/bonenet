@@ -12,6 +12,7 @@ const StyledInput = styled.input`
     border-radius: 8px;
     outline: none;
     box-shadow: 0 0 10px ${(props) => props.theme.boxShadowColor};
+    touch-action: manipulation;
 
     &:focus {
         border-color: ${(props) => props.theme.foreground};
@@ -32,6 +33,7 @@ interface TerminalInputState {
     commandHistory: string[];
     historyIndex: number;
     currentInput: string;
+    isMobile: boolean;
 }
 
 export class TerminalInput extends React.Component<TerminalInputProps, TerminalInputState> {
@@ -43,17 +45,42 @@ export class TerminalInput extends React.Component<TerminalInputProps, TerminalI
             commandHistory: [],
             historyIndex: -1,
             currentInput: '',
+            isMobile: false
         };
     }
 
     componentDidMount() {
-        // Focus the input when the component mounts.
+        this.checkMobile();
+        window.addEventListener('resize', this.checkMobile);
+        
+        // Only auto-focus on desktop
+        if (!this.state.isMobile) {
+            this.inputRef.current?.focus();
+        }
+    }
+
+    componentWillUnmount() {
+        window.removeEventListener('resize', this.checkMobile);
+    }
+
+    private checkMobile = () => {
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile !== this.state.isMobile) {
+            this.setState({ isMobile });
+        }
+    };
+
+    // Public method to allow parent components to force focus
+    public focusInput() {
+        // Allow focus on mobile now
         this.inputRef.current?.focus();
     }
 
-    // Public method to allow parent components to force focus.
-    public focusInput() {
-        this.inputRef.current?.focus();
+    // Add method to maintain focus
+    public maintainFocus() {
+        if (this.inputRef.current && document.activeElement !== this.inputRef.current) {
+            this.inputRef.current.focus();
+        }
     }
 
     private handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -64,14 +91,17 @@ export class TerminalInput extends React.Component<TerminalInputProps, TerminalI
             const command = currentInput.trim();
             if (!command) return;
 
-            // Notify parent of the new command.
+            // Notify parent of the new command
             this.props.onSubmit(command);
 
-            // Update history and clear current input.
+            // Update history and clear current input
             this.setState({
                 commandHistory: [...commandHistory, command],
                 historyIndex: -1,
                 currentInput: '',
+            }, () => {
+                // Maintain focus after submitting
+                this.focusInput();
             });
         } else if (e.key === 'ArrowUp') {
             e.preventDefault();
@@ -109,14 +139,20 @@ export class TerminalInput extends React.Component<TerminalInputProps, TerminalI
     };
 
     render() {
+        const { isMobile } = this.state;
+
         return (
             <StyledInput
                 ref={this.inputRef}
-                autoFocus
+                autoFocus={!isMobile}
                 type="text"
                 value={this.state.currentInput}
                 onChange={this.handleChange}
                 onKeyDown={this.handleKeyDown}
+                onBlur={() => {
+                    // Small delay to allow other interactions
+                    setTimeout(() => this.maintainFocus(), 100);
+                }}
                 placeholder="Enter command..."
             />
         );

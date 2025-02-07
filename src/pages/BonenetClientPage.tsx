@@ -358,7 +358,7 @@ const MapContainer = styled.div.attrs<ContainerProps>((props) => ({
     }
 }))<ContainerProps>`
     position: fixed;
-    z-index: 9999;
+    z-index: 9000;  // Lower than movement window
     border: 2px solid ${(props) => props.theme.borderColor};
     border-radius: 8px;
     box-shadow: 0 0 15px ${(props) => props.theme.boxShadowColor};
@@ -368,6 +368,7 @@ const MapContainer = styled.div.attrs<ContainerProps>((props) => ({
     transform: translate3d(0, 0, 0);
     backface-visibility: hidden;
     min-width: 240px;
+    pointer-events: auto;
 
     .xterm-viewport {
         overflow: hidden !important;
@@ -441,13 +442,14 @@ const MovementContainer = styled.div.attrs<ContainerProps>((props) => ({
     }
 }))<ContainerProps>`
     position: fixed;
-    z-index: 9999;
+    z-index: 9500;  // Higher than map window
     background-color: ${(props) => props.theme.background};
     border: 2px solid ${(props) => props.theme.borderColor};
     border-radius: 8px;
     box-shadow: 0 0 15px ${(props) => props.theme.boxShadowColor};
     user-select: none;
     touch-action: none;
+    pointer-events: auto;
 
     @media (max-width: 768px) {
         min-width: 45%;
@@ -560,6 +562,12 @@ const MovementButton = styled.div<{ active?: boolean }>`
     cursor: pointer;
     transition: background-color 0.2s;
     touch-action: manipulation;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    pointer-events: auto;
+    outline: none;
 
     background-color: ${(props) => (props.active ? props.theme.foreground : 'transparent')};
     color: ${(props) => (props.active ? props.theme.background : props.theme.foreground)};
@@ -576,6 +584,11 @@ const MovementButton = styled.div<{ active?: boolean }>`
         width: 36px;
         height: 36px;
         font-size: 0.8rem;
+        touch-action: none;
+        -webkit-focus-ring-color: transparent;
+        &:focus {
+            outline: none;
+        }
     }
 `;
 
@@ -1006,36 +1019,42 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
     private moveNorth = () => {
         if (this.wsManager?.isSocketConnected()) {
             this.wsManager.send('north');
+            this.terminalInputRef.current?.maintainFocus();
         }
     };
 
     private moveSouth = () => {
         if (this.wsManager?.isSocketConnected()) {
             this.wsManager.send('south');
+            this.terminalInputRef.current?.maintainFocus();
         }
     };
 
     private moveWest = () => {
         if (this.wsManager?.isSocketConnected()) {
             this.wsManager.send('west');
+            this.terminalInputRef.current?.maintainFocus();
         }
     };
 
     private moveEast = () => {
         if (this.wsManager?.isSocketConnected()) {
             this.wsManager.send('east');
+            this.terminalInputRef.current?.maintainFocus();
         }
     };
 
     private moveUp = () => {
         if (this.wsManager?.isSocketConnected()) {
             this.wsManager.send('up');
+            this.terminalInputRef.current?.maintainFocus();
         }
     };
 
     private moveDown = () => {
         if (this.wsManager?.isSocketConnected()) {
             this.wsManager.send('down');
+            this.terminalInputRef.current?.maintainFocus();
         }
     };
 
@@ -1362,7 +1381,13 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
 
         // If prompt is open, don't focus the input
         if (!this.state.enterPromptOpen) {
-            this.terminalInputRef.current?.focusInput();
+            // Only focus input if we're not clicking on map or movement windows
+            const target = e.target as HTMLElement;
+            const isMapClick = target.closest('.map-container');
+            const isMovementClick = target.closest('.movement-container');
+            if (!isMapClick && !isMovementClick && window.innerWidth > 768) {
+                this.terminalInputRef.current?.focusInput();
+            }
         }
     };
 
@@ -1748,11 +1773,15 @@ export class BonenetClientPage extends React.Component<{}, BonenetClientState> {
                     <TerminalWrapper ref={this.terminalRef} />
 
                     <InputContainer>
-                        <TerminalInput ref={this.terminalInputRef} onSubmit={this.handleCommandSubmit} />
+                        <TerminalInput 
+                            ref={this.terminalInputRef as React.RefObject<TerminalInput>} 
+                            onSubmit={this.handleCommandSubmit}
+                        />
                     </InputContainer>
 
                     {/* MAP WINDOW */}
                     <MapContainer 
+                        className="map-container"
                         visible={showMap} 
                         x={mapWindowX} 
                         y={mapWindowY} 
